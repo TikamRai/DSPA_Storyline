@@ -22,23 +22,52 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.platform.LocalContext
+import com.example.storyline.android.LoginScreen
+import com.example.storyline.android.SignupActivity
+import com.example.storyline.android.Theme
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.ktx.auth
+import com.google.firebase.ktx.Firebase
 
 class LoginActivity : ComponentActivity() {
+    private lateinit var auth: FirebaseAuth
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        auth = Firebase.auth
         setContent {
             Theme {
-                LoginScreen(onSignUpClick = {
-                    val intent = Intent(this, SignupActivity::class.java)
-                    startActivity(intent)
-                })
+                LoginScreen(
+                    onSignUpClick = {
+                        val intent = Intent(this, SignupActivity::class.java)
+                        startActivity(intent)
+                    },
+                    onLoginClick = { email, password ->
+                        loginUser(email, password)
+                    }
+                )
             }
         }
+    }
+
+    private fun loginUser(email: String, password: String) {
+        auth.signInWithEmailAndPassword(email, password)
+            .addOnCompleteListener(this) { task ->
+                if (task.isSuccessful) {
+                    val intent = Intent(this, MainActivity::class.java)
+                    startActivity(intent)
+                } else {
+                    // Handle login failure
+                }
+            }
     }
 }
 
 @Composable
-fun LoginScreen(onSignUpClick: () -> Unit) {
+fun LoginScreen(onSignUpClick: () -> Unit, onLoginClick: (String, String) -> Unit) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var rememberMe by remember { mutableStateOf(false) }
@@ -160,7 +189,13 @@ fun LoginScreen(onSignUpClick: () -> Unit) {
             Spacer(modifier = Modifier.height(10.dp))
 
             ElevatedButton(
-                onClick = { /* Handle login */ },
+                onClick = {
+                    if (email.isNotEmpty() && password.isNotEmpty()) {
+                        onLoginClick(email, password)
+                    } else {
+                        // Handle empty email or password
+                    }
+                },
                 border = BorderStroke(1.dp, Color.Black),
                 modifier = Modifier
                     .fillMaxWidth(0.90f)
@@ -215,4 +250,3 @@ fun LoginScreen(onSignUpClick: () -> Unit) {
         }
     }
 }
-

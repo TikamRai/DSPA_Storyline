@@ -23,25 +23,43 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.storyline.SignupViewModel
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.ktx.auth
+import com.google.firebase.ktx.Firebase
 
+//firebase integration
 class SignupActivity : ComponentActivity() {
     private val viewModel = SignupViewModel()
+    private lateinit var auth: FirebaseAuth
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
+            auth = Firebase.auth
             Theme {
                 SignupScreen(onLoginClick = {
                     val intent = Intent(this, LoginActivity::class.java)
                     startActivity(intent)
-                },viewModel = viewModel)
+                }, viewModel = viewModel, auth = auth)
             }
         }
     }
 }
 
+// Function to handle Firebase sign up
+private fun signUpWithEmailAndPassword(email: String, password: String, auth: FirebaseAuth) {
+    auth.createUserWithEmailAndPassword(email, password)
+        .addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                val user = auth.currentUser
+            } else {
+                val exception = task.exception
+            }
+        }
+}
+
 @Composable
-fun SignupScreen(onLoginClick: () -> Unit, viewModel: SignupViewModel) {
+fun SignupScreen(onLoginClick: () -> Unit, viewModel: SignupViewModel, auth: FirebaseAuth) {
     val name by viewModel.name.collectAsState()
     val email by viewModel.email.collectAsState()
     val password by viewModel.password.collectAsState()
@@ -143,7 +161,9 @@ fun SignupScreen(onLoginClick: () -> Unit, viewModel: SignupViewModel) {
             Spacer(modifier = Modifier.height(40.dp))
 
             ElevatedButton(
-                onClick = { viewModel.signUp() },
+                onClick ={
+                    signUpWithEmailAndPassword(email, password, auth)
+                },
                 border = BorderStroke(1.dp, Color.Black),
                 modifier = Modifier
                     .fillMaxWidth(0.90f)

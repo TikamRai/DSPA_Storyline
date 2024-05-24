@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "649536737116",
+    "project_id": "dspa-storyline",
+    "storage_bucket": "dspa-storyline.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:649536737116:android:f12fb5350f7101dcb1fb99",
+        "android_client_info": {
+          "package_name": "com.example.storyline.android"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA-x6ZioJKqrhnbREax8odcpH_xON_NMcU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
