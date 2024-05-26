@@ -46,6 +46,9 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.androidx.activity.compose)
     implementation(libs.firebase.auth)
+    implementation(libs.firebase.storage.ktx)
+    implementation(libs.firebase.firestore.ktx)
     debugImplementation(libs.compose.ui.tooling)
 }
+
 apply(plugin = "com.google.gms.google-services")

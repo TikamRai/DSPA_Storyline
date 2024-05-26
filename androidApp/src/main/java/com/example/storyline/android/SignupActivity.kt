@@ -71,8 +71,7 @@ fun SignupScreen(onLoginClick: () -> Unit, viewModel: SignupViewModel, auth: Fir
     ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
+                .fillMaxSize(),
             verticalArrangement = Arrangement.Center
         ) {
             Text(
@@ -210,7 +209,7 @@ fun SignupScreen(onLoginClick: () -> Unit, viewModel: SignupViewModel, auth: Fir
                 )
             ) {
                 Text(
-                    "Login",
+                    text = "Login",
                     fontSize = 18.sp,
                     textDecoration = TextDecoration.Underline
                 )

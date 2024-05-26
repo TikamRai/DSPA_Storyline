@@ -2,6 +2,7 @@ package com.example.storyline.android
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.BorderStroke
@@ -57,10 +58,11 @@ class LoginActivity : ComponentActivity() {
         auth.signInWithEmailAndPassword(email, password)
             .addOnCompleteListener(this) { task ->
                 if (task.isSuccessful) {
-                    val intent = Intent(this, MainActivity::class.java)
+                    Toast.makeText(baseContext, "login Successful.", Toast.LENGTH_SHORT).show()
+                    val intent = Intent(this, ProfileActivity::class.java)
                     startActivity(intent)
                 } else {
-                    // Handle login failure
+                    Toast.makeText(baseContext, "Login failed: ${task.exception?.message}", Toast.LENGTH_LONG).show()
                 }
             }
     }
@@ -78,8 +80,7 @@ fun LoginScreen(onSignUpClick: () -> Unit, onLoginClick: (String, String) -> Uni
     ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
+                .fillMaxSize(),
             verticalArrangement = Arrangement.Center
         ) {
             Image(
