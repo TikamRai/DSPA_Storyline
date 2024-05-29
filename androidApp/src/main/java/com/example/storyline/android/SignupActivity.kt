@@ -2,23 +2,22 @@ package com.example.storyline.android
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-//noinspection UsingMaterialAndMaterial3Libraries
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -27,7 +26,6 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
 
-//firebase integration
 class SignupActivity : ComponentActivity() {
     private val viewModel = SignupViewModel()
     private lateinit var auth: FirebaseAuth
@@ -40,30 +38,76 @@ class SignupActivity : ComponentActivity() {
                 SignupScreen(onLoginClick = {
                     val intent = Intent(this, LoginActivity::class.java)
                     startActivity(intent)
-                }, viewModel = viewModel, auth = auth)
+                }, viewModel = viewModel, auth = auth, onSignUpSuccess = {
+                    val intent = Intent(this, ProfileActivity::class.java)
+                    startActivity(intent)
+                })
             }
         }
     }
 }
 
-// Function to handle Firebase sign up
-private fun signUpWithEmailAndPassword(email: String, password: String, auth: FirebaseAuth) {
+private fun isEmailValid(email: String): Boolean {
+    return android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
+}
+
+private fun signUpWithEmailAndPassword(
+    name: String,
+    email: String,
+    password: String,
+    confirmationPassword: String,
+    auth: FirebaseAuth,
+    onSignUpSuccess: () -> Unit,
+    onSignUpFailure: (String) -> Unit
+) {
+    if (name.isEmpty()) {
+        onSignUpFailure("Name is required")
+        return
+    }
+
+    if (email.isEmpty()) {
+        onSignUpFailure("Email is required")
+        return
+    }
+
+    if (!isEmailValid(email)) {
+        onSignUpFailure("Enter valid email")
+        return
+    }
+
+    if (password.isEmpty()) {
+        onSignUpFailure("Password is required")
+        return
+    }
+
+    if (password != confirmationPassword) {
+        onSignUpFailure("The passwords do not match")
+        return
+    }
+
     auth.createUserWithEmailAndPassword(email, password)
         .addOnCompleteListener { task ->
             if (task.isSuccessful) {
-                val user = auth.currentUser
+                onSignUpSuccess()
             } else {
-                val exception = task.exception
+                task.exception?.message?.let { onSignUpFailure(it) }
             }
         }
 }
 
 @Composable
-fun SignupScreen(onLoginClick: () -> Unit, viewModel: SignupViewModel, auth: FirebaseAuth) {
+fun SignupScreen(
+    onLoginClick: () -> Unit,
+    viewModel: SignupViewModel,
+    auth: FirebaseAuth,
+    onSignUpSuccess: () -> Unit
+) {
     val name by viewModel.name.collectAsState()
     val email by viewModel.email.collectAsState()
     val password by viewModel.password.collectAsState()
     val confirmationPassword by viewModel.confirmationPassword.collectAsState()
+    var errorMessage by remember { mutableStateOf("") }
+    val context = LocalContext.current
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -157,20 +201,45 @@ fun SignupScreen(onLoginClick: () -> Unit, viewModel: SignupViewModel, auth: Fir
                 shape = RoundedCornerShape(10.dp),
                 visualTransformation = PasswordVisualTransformation()
             )
-            Spacer(modifier = Modifier.height(40.dp))
+            Spacer(modifier = Modifier.height(10.dp))
+
+            if (errorMessage.isNotEmpty()) {
+                Text(
+                    text = errorMessage,
+                    color = Color.Red,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+            }
 
             ElevatedButton(
-                onClick ={
-                    signUpWithEmailAndPassword(email, password, auth)
+                onClick = {
+                    signUpWithEmailAndPassword(
+                        name,
+                        email,
+                        password,
+                        confirmationPassword,
+                        auth,
+                        onSignUpSuccess = {
+                            Toast.makeText(
+                                context,
+                                "Registered successfully",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            onSignUpSuccess()
+                        },
+                        onSignUpFailure = {
+                            errorMessage = it
+                        }
+                    )
                 },
                 border = BorderStroke(1.dp, Color.Black),
                 modifier = Modifier
                     .fillMaxWidth(0.90f)
-                    .fillMaxHeight(0.20f)
                     .padding(2.dp)
                     .align(Alignment.CenterHorizontally),
                 shape = RoundedCornerShape(5.dp),
-                colors = ButtonColors(
+                colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFF8BBF8C),
                     contentColor = Color.Black,
                     disabledContainerColor = Color.Gray,
@@ -181,7 +250,8 @@ fun SignupScreen(onLoginClick: () -> Unit, viewModel: SignupViewModel, auth: Fir
                     "Sign Up",
                     color = Color.Black,
                     fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight
+                        .Bold
                 )
             }
             Spacer(modifier = Modifier.height(20.dp))
@@ -201,11 +271,9 @@ fun SignupScreen(onLoginClick: () -> Unit, viewModel: SignupViewModel, auth: Fir
                     .padding(2.dp)
                     .align(Alignment.CenterHorizontally),
                 shape = RoundedCornerShape(10.dp),
-                colors = ButtonColors(
+                colors = ButtonDefaults.textButtonColors(
                     containerColor = Color.Transparent,
-                    contentColor = Color(0xFF2DAAFF),
-                    disabledContainerColor = Color.Gray,
-                    disabledContentColor = Color.Transparent
+                    contentColor = Color(0xFF2DAAFF)
                 )
             ) {
                 Text(
