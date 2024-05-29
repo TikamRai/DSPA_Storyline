@@ -1,5 +1,6 @@
 package com.example.storyline.android
 
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
@@ -16,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -23,12 +25,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.ui.platform.LocalContext
-import com.example.storyline.android.LoginScreen
-import com.example.storyline.android.SignupActivity
-import com.example.storyline.android.Theme
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
@@ -46,19 +42,29 @@ class LoginActivity : ComponentActivity() {
                         val intent = Intent(this, SignupActivity::class.java)
                         startActivity(intent)
                     },
-                    onLoginClick = { email, password ->
-                        loginUser(email, password)
+                    onLoginClick = { email, password, rememberMe ->
+                        loginUser(email, password, rememberMe)
+                    },
+                    onForgotPasswordClick = { email ->
+                        sendPasswordResetEmail(email)
                     }
                 )
             }
         }
     }
 
-    private fun loginUser(email: String, password: String) {
+    private fun loginUser(email: String, password: String, rememberMe: Boolean) {
         auth.signInWithEmailAndPassword(email, password)
             .addOnCompleteListener(this) { task ->
                 if (task.isSuccessful) {
-                    Toast.makeText(baseContext, "login Successful.", Toast.LENGTH_SHORT).show()
+                    if (rememberMe) {
+                        val sharedPreferences = getSharedPreferences("loginPrefs", Context.MODE_PRIVATE)
+                        with(sharedPreferences.edit()) {
+                            putString("savedEmail", email)
+                            apply()
+                        }
+                    }
+                    Toast.makeText(baseContext, "Login Successful.", Toast.LENGTH_SHORT).show()
                     val intent = Intent(this, ProfileActivity::class.java)
                     startActivity(intent)
                 } else {
@@ -66,11 +72,28 @@ class LoginActivity : ComponentActivity() {
                 }
             }
     }
+
+    private fun sendPasswordResetEmail(email: String) {
+        auth.sendPasswordResetEmail(email)
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    Toast.makeText(baseContext, "Password reset email sent.", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(baseContext, "Failed to send password reset email.", Toast.LENGTH_SHORT).show()
+                }
+            }
+    }
 }
 
 @Composable
-fun LoginScreen(onSignUpClick: () -> Unit, onLoginClick: (String, String) -> Unit) {
-    var email by remember { mutableStateOf("") }
+fun LoginScreen(
+    onSignUpClick: () -> Unit,
+    onLoginClick: (String, String, Boolean) -> Unit,
+    onForgotPasswordClick: (String) -> Unit
+) {
+    val context = LocalContext.current
+    val sharedPreferences = context.getSharedPreferences("loginPrefs", Context.MODE_PRIVATE)
+    var email by remember { mutableStateOf(sharedPreferences.getString("savedEmail", "") ?: "") }
     var password by remember { mutableStateOf("") }
     var rememberMe by remember { mutableStateOf(false) }
 
@@ -84,7 +107,7 @@ fun LoginScreen(onSignUpClick: () -> Unit, onLoginClick: (String, String) -> Uni
             verticalArrangement = Arrangement.Center
         ) {
             Image(
-                painter = painterResource(id = R.drawable.applogo),
+                painter = painterResource(id = com.example.storyline.android.R.drawable.applogo),
                 contentDescription = "AppLogo",
                 modifier = Modifier
                     .size(150.dp)
@@ -143,7 +166,12 @@ fun LoginScreen(onSignUpClick: () -> Unit, onLoginClick: (String, String) -> Uni
             )
             Spacer(modifier = Modifier.height(10.dp))
 
-            Row(horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth(0.90f)
+                    .align(Alignment.CenterHorizontally),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
                 Column(
                     modifier = Modifier
                         .padding(start = 6.dp)
@@ -153,7 +181,7 @@ fun LoginScreen(onSignUpClick: () -> Unit, onLoginClick: (String, String) -> Uni
                         onCheckedChange = { rememberMe = it }
                     )
                 }
-                Column() {
+                Column {
                     Text(
                         text = "Remember Me",
                         fontSize = 18.sp,
@@ -167,16 +195,14 @@ fun LoginScreen(onSignUpClick: () -> Unit, onLoginClick: (String, String) -> Uni
                         .padding(start = 16.dp)
                 ) {
                     TextButton(
-                        onClick = { /* Handle forgot password */ },
+                        onClick = { onForgotPasswordClick(email) },
                         modifier = Modifier
                             .padding(2.dp)
                             .align(Alignment.End),
                         shape = RoundedCornerShape(10.dp),
-                        colors = ButtonColors(
+                        colors = ButtonDefaults.textButtonColors(
                             containerColor = Color.Transparent,
-                            contentColor = Color(0xFF2DAAFF),
-                            disabledContainerColor = Color.Gray,
-                            disabledContentColor = Color.Transparent
+                            contentColor = Color(0xFF2DAAFF)
                         )
                     ) {
                         Text(
@@ -192,19 +218,18 @@ fun LoginScreen(onSignUpClick: () -> Unit, onLoginClick: (String, String) -> Uni
             ElevatedButton(
                 onClick = {
                     if (email.isNotEmpty() && password.isNotEmpty()) {
-                        onLoginClick(email, password)
+                        onLoginClick(email, password, rememberMe)
                     } else {
-                        // Handle empty email or password
+                        Toast.makeText(context, "Email or password is empty!!", Toast.LENGTH_SHORT).show()
                     }
                 },
                 border = BorderStroke(1.dp, Color.Black),
                 modifier = Modifier
                     .fillMaxWidth(0.90f)
-                    .fillMaxHeight(0.20f)
                     .padding(2.dp)
                     .align(Alignment.CenterHorizontally),
                 shape = RoundedCornerShape(5.dp),
-                colors = ButtonColors(
+                colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFF8BBF8C),
                     contentColor = Color.Black,
                     disabledContainerColor = Color.Gray,
@@ -235,11 +260,9 @@ fun LoginScreen(onSignUpClick: () -> Unit, onLoginClick: (String, String) -> Uni
                     .padding(2.dp)
                     .align(Alignment.CenterHorizontally),
                 shape = RoundedCornerShape(10.dp),
-                colors = ButtonColors(
+                colors = ButtonDefaults.textButtonColors(
                     containerColor = Color.Transparent,
-                    contentColor = Color(0xFF2DAAFF),
-                    disabledContainerColor = Color.Gray,
-                    disabledContentColor = Color.Transparent
+                    contentColor = Color(0xFF2DAAFF)
                 )
             ) {
                 Text(
