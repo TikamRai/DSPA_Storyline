@@ -9,11 +9,15 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import coil.compose.rememberImagePainter
+import coil.annotation.ExperimentalCoilApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,26 +32,80 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
+import com.google.firebase.auth.FirebaseUser
 import com.example.storyline.android.R
+import kotlinx.coroutines.launch
 
 class ProfileActivity : ComponentActivity() {
     private lateinit var auth: FirebaseAuth
+    private lateinit var user: FirebaseUser
     private lateinit var storage: FirebaseStorage
     private lateinit var firestore: FirebaseFirestore
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         auth = FirebaseAuth.getInstance()
+        user = auth.currentUser!!
         storage = FirebaseStorage.getInstance()
         firestore = FirebaseFirestore.getInstance()
-        setContent {
-            Theme {
-                ProfileScreen(onProfilePictureClick = { pickImage() }, onLogoutClick =  { logout()})
+
+        val userEmail = user.email ?: "No email"
+
+        firestore.collection("users").document(user.uid).get()
+            .addOnSuccessListener { document ->
+                if (document != null) {
+                    val userName = document.getString("name") ?: "Anonymous"
+                    val profilePictureUrl = document.getString("profilePictureUrl")
+                    val followers = document.get("followers") as? List<String> ?: emptyList()
+                    val following = document.get("following") as? List<String> ?: emptyList()
+                    setContent {
+                        val navController = rememberNavController()
+                        Theme {
+                            NavHost(navController = navController, startDestination = "profile") {
+                                composable("profile") {
+                                    ProfileScreen(
+                                        name = userName,
+                                        email = userEmail,
+                                        profilePictureUrl = profilePictureUrl,
+                                        followersCount = followers.size,
+                                        followingCount = following.size,
+                                        onProfilePictureClick = { pickImage() },
+                                        onFollowersClick = { navController.navigate("followers") },
+                                        onFollowingClick = { navController.navigate("following") },
+                                        onLogoutClick = { logout() }
+                                    )
+                                }
+                                composable("followers") {
+                                    FollowersScreen(navController, followers)
+                                }
+                                composable("following") {
+                                    FollowingScreen(navController, following)
+                                }
+                                composable("userProfile/{userId}") {backStackEntry ->
+                                    val userId = backStackEntry.arguments?.getString("userId") ?:return@composable
+                                    UserProfileScreen(navController, userId)
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Toast.makeText(this, "No such document", Toast.LENGTH_SHORT).show()
+                }
             }
-        }
+            .addOnFailureListener { exception ->
+                Toast.makeText(
+                    this,
+                    "Failed to fetch user data: ${exception.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
     }
 
     private val pickImageLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
@@ -93,12 +151,21 @@ class ProfileActivity : ComponentActivity() {
 }
 
 @Composable
-fun ProfileScreen(onProfilePictureClick: () -> Unit, onLogoutClick: () -> Unit) {
-    var name by remember { mutableStateOf("John Green") }
-    var email by remember { mutableStateOf("johngreen@email.com") }
-    var description by remember { mutableStateOf("abcdefgihjklmnopqrstuvwxyz") }
-    var followers by remember { mutableStateOf(0) }
-    var following by remember { mutableStateOf(0) }
+fun ProfileScreen(
+    name: String,
+    email: String,
+    profilePictureUrl: String?,
+    followersCount: Int,
+    followingCount: Int,
+    onProfilePictureClick: () -> Unit,
+    onFollowersClick:() -> Unit,
+    onFollowingClick:() -> Unit,
+    onLogoutClick: () -> Unit
+) {
+    var name by remember { mutableStateOf(name) }
+    var email by remember { mutableStateOf(email) }
+    var followers by remember { mutableStateOf(followersCount) }
+    var following by remember { mutableStateOf(followingCount) }
 
     Column(
         modifier = Modifier
@@ -124,16 +191,30 @@ fun ProfileScreen(onProfilePictureClick: () -> Unit, onLogoutClick: () -> Unit) 
         }
         Spacer(modifier = Modifier.height(24.dp))
 
-        Image(
-            painter = painterResource(id = R.drawable.applogo),
-            contentDescription = "Profile Picture",
-            modifier = Modifier
-                .size(200.dp)
-                .clip(CircleShape)
-                .clickable {
-                    onProfilePictureClick()
-                }
-        )
+        if (profilePictureUrl != null) {
+            Image(
+                painter = rememberImagePainter(profilePictureUrl),
+                contentDescription = "Profile Picture",
+                modifier = Modifier
+                    .size(200.dp)
+                    .clip(CircleShape)
+                    .clickable {
+                        onProfilePictureClick()
+                    }
+            )
+        } else {
+            Image(
+                painter = painterResource(id = R.drawable.applogo),
+                contentDescription = "Profile Picture",
+                modifier = Modifier
+                    .size(200.dp)
+                    .clip(CircleShape)
+                    .clickable {
+                        onProfilePictureClick()
+                    }
+            )
+        }
+
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(text = name, fontSize = 24.sp, fontWeight = FontWeight.Bold)
@@ -169,22 +250,46 @@ fun ProfileScreen(onProfilePictureClick: () -> Unit, onLogoutClick: () -> Unit) 
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column() {
-                    Text(
-                        text = "$followers Followers",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
+                    TextButton(
+                        onClick = onFollowersClick,
                         modifier = Modifier
-                            .align(alignment = Alignment.CenterHorizontally),
-                    )
+                            .padding(2.dp)
+                            .align(Alignment.CenterHorizontally),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonColors(
+                            containerColor = Color.Transparent,
+                            contentColor = Color(0xFF2DAAFF),
+                            disabledContainerColor = Color.Gray,
+                            disabledContentColor = Color.Transparent
+                        )
+                    ) {
+                        Text(
+                            text = "$followers Follower",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
                 Column() {
-                    Text(
-                        text = "$following Following",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
+                    TextButton(
+                        onClick = onFollowingClick,
                         modifier = Modifier
-                            .align(alignment = Alignment.CenterHorizontally)
-                    )
+                            .padding(2.dp)
+                            .align(Alignment.CenterHorizontally),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonColors(
+                            containerColor = Color.Transparent,
+                            contentColor = Color(0xFF2DAAFF),
+                            disabledContainerColor = Color.Gray,
+                            disabledContentColor = Color.Transparent
+                        )
+                    ) {
+                        Text(
+                            text = "$following Following",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }
@@ -252,6 +357,149 @@ fun ProfileScreen(onProfilePictureClick: () -> Unit, onLogoutClick: () -> Unit) 
                 fontSize = 18.sp,
                 textDecoration = TextDecoration.Underline
             )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FollowersScreen(navController: NavHostController, followers: List<String>) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Followers") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        }
+    ) {
+        Column(modifier = Modifier.padding(it)) {
+            followers.forEach { follower ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                        .clickable { navController.navigate("userProfile/$follower") },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = follower,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Button(onClick = { /* Handle unfollow logic here */ }) {
+                        Text("Unfollow")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FollowingScreen(navController: NavHostController, following: List<String>) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Following") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        }
+    ) {
+        Column(modifier = Modifier.padding(it)) {
+            following.forEach { follow ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                        .clickable { navController.navigate("userProfile/$follow") },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = follow,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Button(onClick = { /* Handle unfollow logic here */ }) {
+                        Text("Unfollow")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun UserProfileScreen(navController: NavHostController, userId: String) {
+    var userName by remember { mutableStateOf("Loading...") }
+    var userEmail by remember { mutableStateOf("Loading...") }
+    var profilePictureUrl by remember { mutableStateOf<String?>(null) }
+    var followersCount by remember { mutableStateOf(0) }
+    var followingCount by remember { mutableStateOf(0) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    val firestore = FirebaseFirestore.getInstance()
+
+    LaunchedEffect(userId) {
+        firestore.collection("users").document(userId).get()
+            .addOnSuccessListener { document ->
+                if (document != null) {
+                    userName = document.getString("name") ?: "No name"
+                    userEmail = document.getString("email") ?: "No email"
+                    profilePictureUrl = document.getString("profilePictureUrl")
+                    followersCount = (document.get("followers") as? List<*>)?.size ?: 0
+                    followingCount = (document.get("following") as? List<*>)?.size ?: 0
+                }
+            }
+            .addOnFailureListener { exception ->
+                scope.launch{}
+                Toast.makeText(context, "Failed to fetch user data: ${exception.message}", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("User Profile") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        }
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(it)
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            profilePictureUrl?.let { url ->
+                Image(
+                    painter = rememberImagePainter(url),
+                    contentDescription = "Profile Picture",
+                    modifier = Modifier
+                        .size(150.dp)
+                        .clip(CircleShape)
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(text = userName, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(text = userEmail, fontSize = 16.sp, color = Color.Gray)
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(text = "$followersCount Followers", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(text = "$followingCount Following", fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
     }
 }

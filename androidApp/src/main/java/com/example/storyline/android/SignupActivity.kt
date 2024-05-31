@@ -24,21 +24,24 @@ import androidx.compose.ui.unit.sp
 import com.example.storyline.SignupViewModel
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
+import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.ktx.Firebase
 
 class SignupActivity : ComponentActivity() {
     private val viewModel = SignupViewModel()
     private lateinit var auth: FirebaseAuth
+    private lateinit var firestore: FirebaseFirestore
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             auth = Firebase.auth
+            firestore = FirebaseFirestore.getInstance()
             Theme {
                 SignupScreen(onLoginClick = {
                     val intent = Intent(this, LoginActivity::class.java)
                     startActivity(intent)
-                }, viewModel = viewModel, auth = auth, onSignUpSuccess = {
+                }, viewModel = viewModel, auth = auth, firestore = firestore, onSignUpSuccess = {
                     val intent = Intent(this, ProfileActivity::class.java)
                     startActivity(intent)
                 })
@@ -57,6 +60,7 @@ private fun signUpWithEmailAndPassword(
     password: String,
     confirmationPassword: String,
     auth: FirebaseAuth,
+    firestore: FirebaseFirestore,
     onSignUpSuccess: () -> Unit,
     onSignUpFailure: (String) -> Unit
 ) {
@@ -88,7 +92,23 @@ private fun signUpWithEmailAndPassword(
     auth.createUserWithEmailAndPassword(email, password)
         .addOnCompleteListener { task ->
             if (task.isSuccessful) {
-                onSignUpSuccess()
+                val user = auth.currentUser
+                val userId = user?.uid
+                if (userId != null) {
+                    val userMap = hashMapOf(
+                        "name" to name,
+                        "email" to email
+                    )
+                    firestore.collection("users").document(userId).set(userMap)
+                        .addOnSuccessListener {
+                            onSignUpSuccess()
+                        }
+                        .addOnFailureListener { e ->
+                            onSignUpFailure("Failed to save user: ${e.message}")
+                        }
+                } else {
+                    onSignUpFailure("Failed to get user ID")
+                }
             } else {
                 task.exception?.message?.let { onSignUpFailure(it) }
             }
@@ -100,6 +120,7 @@ fun SignupScreen(
     onLoginClick: () -> Unit,
     viewModel: SignupViewModel,
     auth: FirebaseAuth,
+    firestore: FirebaseFirestore,
     onSignUpSuccess: () -> Unit
 ) {
     val name by viewModel.name.collectAsState()
@@ -220,6 +241,7 @@ fun SignupScreen(
                         password,
                         confirmationPassword,
                         auth,
+                        firestore,
                         onSignUpSuccess = {
                             Toast.makeText(
                                 context,
