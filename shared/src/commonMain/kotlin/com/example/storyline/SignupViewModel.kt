@@ -31,9 +31,4 @@ class SignupViewModel {
     fun onConfirmationPasswordChanged(newConfirmationPassword: String) {
         _confirmationPassword.value = newConfirmationPassword
     }
-
-    fun signUp() {
-        // Handle sign-up logic here
-        // For example, validate the input and call an API
-    }
 }

@@ -17,17 +17,15 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
@@ -36,11 +34,11 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import coil.compose.rememberAsyncImagePainter
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.auth.FirebaseUser
-import com.example.storyline.android.R
 import kotlinx.coroutines.launch
 
 class ProfileActivity : ComponentActivity() {
@@ -193,7 +191,7 @@ fun ProfileScreen(
 
         if (profilePictureUrl != null) {
             Image(
-                painter = rememberImagePainter(profilePictureUrl),
+                painter = rememberAsyncImagePainter(profilePictureUrl),
                 contentDescription = "Profile Picture",
                 modifier = Modifier
                     .size(200.dp)
@@ -370,7 +368,7 @@ fun FollowersScreen(navController: NavHostController, followers: List<String>) {
                 title = { Text("Followers") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 }
             )
@@ -407,7 +405,7 @@ fun FollowingScreen(navController: NavHostController, following: List<String>) {
                 title = { Text("Following") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 }
             )
@@ -471,7 +469,7 @@ fun UserProfileScreen(navController: NavHostController, userId: String) {
                 title = { Text("User Profile") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 }
             )
@@ -485,7 +483,7 @@ fun UserProfileScreen(navController: NavHostController, userId: String) {
         ) {
             profilePictureUrl?.let { url ->
                 Image(
-                    painter = rememberImagePainter(url),
+                    painter = rememberAsyncImagePainter(url),
                     contentDescription = "Profile Picture",
                     modifier = Modifier
                         .size(150.dp)

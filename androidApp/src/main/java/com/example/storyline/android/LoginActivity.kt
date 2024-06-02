@@ -95,7 +95,7 @@ fun LoginScreen(
     val sharedPreferences = context.getSharedPreferences("loginPrefs", Context.MODE_PRIVATE)
     var email by remember { mutableStateOf(sharedPreferences.getString("savedEmail", "") ?: "") }
     var password by remember { mutableStateOf("") }
-    var rememberMe by remember { mutableStateOf(false) }
+    var rememberMe by remember { mutableStateOf(email.isNotEmpty()) }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
