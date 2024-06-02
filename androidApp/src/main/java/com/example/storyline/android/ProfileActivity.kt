@@ -118,7 +118,7 @@ class ProfileActivity : ComponentActivity() {
         val user = auth.currentUser ?: return
         val storageRef = storage.reference.child("profile_pictures/${user.uid}.jpg")
         storageRef.putFile(uri)
-            .addOnSuccessListener {
+            .addOnSuccessListener { _ ->
                 storageRef.downloadUrl.addOnSuccessListener { downloadUri ->
                     updateProfilePictureInFireStore(downloadUri)
                 }
@@ -127,6 +127,7 @@ class ProfileActivity : ComponentActivity() {
                 Toast.makeText(this, "Upload failed: ${exception.message}", Toast.LENGTH_SHORT).show()
             }
     }
+
 
     private fun updateProfilePictureInFireStore(uri: Uri) {
         val user = auth.currentUser ?: return
@@ -162,6 +163,7 @@ fun ProfileScreen(
 ) {
     var name by remember { mutableStateOf(name) }
     var email by remember { mutableStateOf(email) }
+    var profilePictureUrl by remember { mutableStateOf(profilePictureUrl)}
     var followers by remember { mutableStateOf(followersCount) }
     var following by remember { mutableStateOf(followingCount) }
 
