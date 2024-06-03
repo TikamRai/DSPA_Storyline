@@ -1,5 +1,7 @@
 package com.example.storyline.android
 
+import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -19,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
@@ -60,7 +63,9 @@ fun CreateScreen(navController: NavHostController) {
             )
         },
         bottomBar = {
-            BottomNavigationBar(currentRoute = "create")
+            BottomNavigationBar(currentRoute = "create", context = LocalContext.current)
+
+
         }
     ) {
         Column(
@@ -134,7 +139,7 @@ fun CreateScreen(navController: NavHostController) {
 }
 
 @Composable
-fun BottomNavigationBar(currentRoute: String) {
+fun BottomNavigationBar(currentRoute: String, context: Context) {
     NavigationBar(
         modifier = Modifier
             .fillMaxHeight(0.07f),
@@ -159,7 +164,10 @@ fun BottomNavigationBar(currentRoute: String) {
         NavigationBarItem(
             icon = { Icon(painterResource(id = R.drawable.ic_profile), contentDescription = "Profile") },
             selected = currentRoute == "profile",
-            onClick = { /* Navigate to Profile */ }
+            onClick = {
+                val intent = Intent(context, ProfileActivity::class.java)
+                context.startActivity(intent)
+            }
         )
     }
 }

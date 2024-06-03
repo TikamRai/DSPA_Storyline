@@ -1,5 +1,5 @@
 package com.example.storyline.android
-
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -9,13 +9,15 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
-import coil.compose.rememberImagePainter
-import coil.annotation.ExperimentalCoilApi
+import coil.compose.rememberAsyncImagePainter
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
@@ -32,9 +34,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import coil.compose.rememberAsyncImagePainter
+import androidx.compose.material3.TopAppBar
+import androidx.navigation.compose.*
+import coil.compose.rememberImagePainter
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
@@ -77,7 +80,8 @@ class ProfileActivity : ComponentActivity() {
                                         onProfilePictureClick = { pickImage() },
                                         onFollowersClick = { navController.navigate("followers") },
                                         onFollowingClick = { navController.navigate("following") },
-                                        onLogoutClick = { logout() }
+                                        onLogoutClick = { logout() },
+                                        navController = navController
                                     )
                                 }
                                 composable("followers") {
@@ -159,7 +163,8 @@ fun ProfileScreen(
     onProfilePictureClick: () -> Unit,
     onFollowersClick:() -> Unit,
     onFollowingClick:() -> Unit,
-    onLogoutClick: () -> Unit
+    onLogoutClick: () -> Unit,
+    navController: NavHostController
 ) {
     var name by remember { mutableStateOf(name) }
     var email by remember { mutableStateOf(email) }
@@ -313,7 +318,7 @@ fun ProfileScreen(
                 text = "Published Stories",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold
-                )
+            )
         }
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -334,7 +339,7 @@ fun ProfileScreen(
                 text = "Reading List",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold
-                )
+            )
         }
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -358,6 +363,41 @@ fun ProfileScreen(
                 textDecoration = TextDecoration.Underline
             )
         }
+        Spacer(modifier = Modifier.weight(1f))
+        BottomNavigationBar(currentRoute = "profile", navController = navController, context = LocalContext.current)
+    }
+}
+
+@Composable
+fun BottomNavigationBar(currentRoute: String, navController: NavHostController, context: Context) {
+    NavigationBar(
+        modifier = Modifier.fillMaxHeight(0.5f),
+        containerColor = Color(0xFF8BBF8C),
+        contentColor = Color.Black
+    ) {
+        NavigationBarItem(
+            icon = { Icon(painterResource(id = R.drawable.ic_home), contentDescription = "Home") },
+            selected = currentRoute == "home",
+            onClick = { navController.navigate("home") }
+        )
+        NavigationBarItem(
+            icon = { Icon(painterResource(id = R.drawable.ic_search), contentDescription = "Search") },
+            selected = currentRoute == "search",
+            onClick = { navController.navigate("search") }
+        )
+        NavigationBarItem(
+            icon = { Icon(painterResource(id = R.drawable.ic_create), contentDescription = "Create") },
+            selected = currentRoute == "create",
+            onClick = {
+                val intent = Intent(context, CreateStoryActivity::class.java)
+                context.startActivity(intent)
+            }
+        )
+        NavigationBarItem(
+            icon = { Icon(painterResource(id = R.drawable.ic_profile), contentDescription = "Profile") },
+            selected = currentRoute == "profile",
+            onClick = {  }
+        )
     }
 }
 
