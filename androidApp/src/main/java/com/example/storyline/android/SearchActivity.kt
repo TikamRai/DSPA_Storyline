@@ -32,7 +32,7 @@ import androidx.navigation.compose.rememberNavController
 import coil.compose.rememberAsyncImagePainter
 import com.google.firebase.firestore.FirebaseFirestore
 
-class SearchUserActivity : ComponentActivity() {
+class SearchActivity : ComponentActivity() {
     private lateinit var firestore: FirebaseFirestore
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,12 +46,21 @@ class SearchUserActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchUserApp(navController: NavHostController, firestore: FirebaseFirestore) {
     val context = LocalContext.current
 
     Scaffold(
-        bottomBar = { BottomNavigationBar(currentRoute = "search", navController = navController) }
+        topBar = {
+            TopAppBar(
+                title = { Text("Search") },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF8BBF8C))
+            )
+        },
+        bottomBar = {
+            BottomNavigationBar(currentRoute = "search", navController = navController)
+        }
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
             SearchUserScreen(navController, firestore)
@@ -188,21 +197,23 @@ fun BottomNavigationBar(currentRoute: String, navController: NavHostController) 
     val context = LocalContext.current
 
     NavigationBar(
+        modifier = Modifier
+            .fillMaxHeight(0.07f),
         containerColor = Color(0xFF8BBF8C),
         contentColor = Color.Black
     ) {
         NavigationBarItem(
             icon = { Icon(painterResource(id = R.drawable.ic_home), contentDescription = "Home") },
             selected = currentRoute == "home",
-            onClick = { navController.navigate("home") }
+            onClick = {
+                val intent = Intent(context, HomeActivity::class.java)
+                context.startActivity(intent)
+            }
         )
         NavigationBarItem(
             icon = { Icon(painterResource(id = R.drawable.ic_search), contentDescription = "Search") },
             selected = currentRoute == "search",
-            onClick = {
-                val intent = Intent(context, SearchUserActivity::class.java)
-                context.startActivity(intent)
-            }
+            onClick = { }
         )
         NavigationBarItem(
             icon = { Icon(painterResource(id = R.drawable.ic_create), contentDescription = "Create") },

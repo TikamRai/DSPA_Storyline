@@ -65,7 +65,7 @@ class LoginActivity : ComponentActivity() {
                         }
                     }
                     Toast.makeText(baseContext, "Login Successful.", Toast.LENGTH_SHORT).show()
-                    val intent = Intent(this, ProfileActivity::class.java)
+                    val intent = Intent(this, HomeActivity::class.java)
                     startActivity(intent)
                 } else {
                     Toast.makeText(baseContext, "Login failed: ${task.exception?.message}", Toast.LENGTH_LONG).show()

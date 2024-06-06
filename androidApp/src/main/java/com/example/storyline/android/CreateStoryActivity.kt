@@ -12,7 +12,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -36,8 +35,8 @@ class CreateStoryActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
+            val navController = rememberNavController()
             Theme {
-                val navController = rememberNavController()
                 NavHost(navController, startDestination = "create_screen") {
                     composable("create_screen") { CreateScreen(navController) }
                     composable("creation_screen") { CreationScreen(navController)}
@@ -53,19 +52,12 @@ fun CreateScreen(navController: NavHostController) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Write") },
-                navigationIcon = {
-                    IconButton(onClick = { /* Handle back navigation */ }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
+                title = { Text("Create Story") },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF8BBF8C))
             )
         },
         bottomBar = {
             BottomNavigationBar(currentRoute = "create", context = LocalContext.current)
-
-
         }
     ) {
         Column(
@@ -149,23 +141,23 @@ fun BottomNavigationBar(currentRoute: String, context: Context) {
         NavigationBarItem(
             icon = { Icon(painterResource(id = R.drawable.ic_home), contentDescription = "Home") },
             selected = currentRoute == "home",
-            onClick = { /* Navigate to Home */ }
+            onClick = {
+                val intent = Intent(context, HomeActivity::class.java)
+                context.startActivity(intent)
+            }
         )
         NavigationBarItem(
             icon = { Icon(painterResource(id = R.drawable.ic_search), contentDescription = "Search") },
             selected = currentRoute == "search",
             onClick = {
-                val intent = Intent(context, SearchUserActivity::class.java)
+                val intent = Intent(context, SearchActivity::class.java)
                 context.startActivity(intent)
             }
         )
         NavigationBarItem(
             icon = { Icon(painterResource(id = R.drawable.ic_create), contentDescription = "Create") },
             selected = currentRoute == "create",
-            onClick = {
-                val intent = Intent(context, CreateStoryActivity::class.java)
-                context.startActivity(intent)
-            }
+            onClick = { }
         )
         NavigationBarItem(
             icon = { Icon(painterResource(id = R.drawable.ic_profile), contentDescription = "Profile") },
