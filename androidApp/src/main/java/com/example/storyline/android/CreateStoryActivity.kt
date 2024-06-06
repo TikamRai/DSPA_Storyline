@@ -162,7 +162,10 @@ fun BottomNavigationBar(currentRoute: String, context: Context) {
         NavigationBarItem(
             icon = { Icon(painterResource(id = R.drawable.ic_create), contentDescription = "Create") },
             selected = currentRoute == "create",
-            onClick = { /* Navigate to Write Story Page */ }
+            onClick = {
+                val intent = Intent(context, CreateStoryActivity::class.java)
+                context.startActivity(intent)
+            }
         )
         NavigationBarItem(
             icon = { Icon(painterResource(id = R.drawable.ic_profile), contentDescription = "Profile") },

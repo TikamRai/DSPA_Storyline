@@ -399,7 +399,10 @@ fun BottomNavigationBar(currentRoute: String, navController: NavHostController, 
         NavigationBarItem(
             icon = { Icon(painterResource(id = R.drawable.ic_profile), contentDescription = "Profile") },
             selected = currentRoute == "profile",
-            onClick = {  }
+            onClick = {
+                val intent = Intent(context, ProfileActivity::class.java)
+                context.startActivity(intent)
+            }
         )
     }
 }

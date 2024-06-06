@@ -9,10 +9,12 @@
     <application
         android:allowBackup="true"
         android:supportsRtl="true"
-        android:theme="@style/AppTheme">
+        android:theme="@style/AppTheme"
+        android:label="StoryLine"
+        android:icon="@drawable/applogo">
 
         <activity
-            android:name=".SearchUserActivity"
+            android:name=".LoginActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -23,6 +25,7 @@
         <activity android:name=".CreateStoryActivity" />
         <activity android:name=".SignupActivity" />
         <activity android:name=".ProfileActivity" />
+        <activity android:name=".SearchUserActivity"/>
 
     </application>
 </manifest> 
