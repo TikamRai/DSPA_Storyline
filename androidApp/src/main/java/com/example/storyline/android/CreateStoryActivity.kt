@@ -154,7 +154,10 @@ fun BottomNavigationBar(currentRoute: String, context: Context) {
         NavigationBarItem(
             icon = { Icon(painterResource(id = R.drawable.ic_search), contentDescription = "Search") },
             selected = currentRoute == "search",
-            onClick = { /* Navigate to Search */ }
+            onClick = {
+                val intent = Intent(context, SearchUserActivity::class.java)
+                context.startActivity(intent)
+            }
         )
         NavigationBarItem(
             icon = { Icon(painterResource(id = R.drawable.ic_create), contentDescription = "Create") },
