@@ -19,6 +19,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.rememberAsyncImagePainter
 import coil.compose.rememberImagePainter
 
 class HomeActivity : ComponentActivity() {
@@ -29,6 +30,11 @@ class HomeActivity : ComponentActivity() {
                 HomeScreen()
             }
         }
+    }
+
+    override fun onBackPressed() {
+        super.onBackPressed()
+        finishAffinity()
     }
 }
 
@@ -67,7 +73,7 @@ fun StoryItem(story: Story) {
             .padding(8.dp)
     ) {
         Image(
-            painter = rememberImagePainter(data = story.imageUrl),
+            painter = rememberAsyncImagePainter(model = story.imageUrl),
             contentDescription = story.title,
             modifier = Modifier
                 .fillMaxWidth()
@@ -104,7 +110,12 @@ fun BottomNavigationBar(currentRoute: String) {
             onClick = { }
         )
         NavigationBarItem(
-            icon = { Icon(painterResource(id = R.drawable.ic_search), contentDescription = "Search") },
+            icon = {
+                Icon(
+                    painterResource(id = R.drawable.ic_search),
+                    contentDescription = "Search"
+                )
+            },
             selected = currentRoute == "search",
             onClick = {
                 val intent = Intent(context, SearchActivity::class.java)
@@ -112,7 +123,12 @@ fun BottomNavigationBar(currentRoute: String) {
             }
         )
         NavigationBarItem(
-            icon = { Icon(painterResource(id = R.drawable.ic_create), contentDescription = "Create") },
+            icon = {
+                Icon(
+                    painterResource(id = R.drawable.ic_create),
+                    contentDescription = "Create"
+                )
+            },
             selected = currentRoute == "create",
             onClick = {
                 val intent = Intent(context, CreateStoryActivity::class.java)
@@ -120,7 +136,12 @@ fun BottomNavigationBar(currentRoute: String) {
             }
         )
         NavigationBarItem(
-            icon = { Icon(painterResource(id = R.drawable.ic_profile), contentDescription = "Profile") },
+            icon = {
+                Icon(
+                    painterResource(id = R.drawable.ic_profile),
+                    contentDescription = "Profile"
+                )
+            },
             selected = currentRoute == "profile",
             onClick = {
                 val intent = Intent(context, ProfileActivity::class.java)

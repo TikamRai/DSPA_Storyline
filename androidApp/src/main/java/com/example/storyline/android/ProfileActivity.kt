@@ -90,8 +90,9 @@ class ProfileActivity : ComponentActivity() {
                                 composable("following") {
                                     FollowingScreen(navController, following)
                                 }
-                                composable("userProfile/{userId}") {backStackEntry ->
-                                    val userId = backStackEntry.arguments?.getString("userId") ?:return@composable
+                                composable("userProfile/{userId}") { backStackEntry ->
+                                    val userId = backStackEntry.arguments?.getString("userId")
+                                        ?: return@composable
                                     UserProfileScreen(navController, userId)
                                 }
                             }
@@ -110,9 +111,17 @@ class ProfileActivity : ComponentActivity() {
             }
     }
 
-    private val pickImageLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        uri?.let { uploadImage(it) }
+    override fun onBackPressed() {
+        super.onBackPressed()
+        val intent = Intent(this, HomeActivity::class.java)
+        startActivity(intent)
+        finish()
     }
+
+    private val pickImageLauncher =
+        registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+            uri?.let { uploadImage(it) }
+        }
 
     private fun pickImage() {
         pickImageLauncher.launch("image/*")
@@ -128,7 +137,8 @@ class ProfileActivity : ComponentActivity() {
                 }
             }
             .addOnFailureListener { exception ->
-                Toast.makeText(this, "Upload failed: ${exception.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Upload failed: ${exception.message}", Toast.LENGTH_SHORT)
+                    .show()
             }
     }
 
@@ -141,7 +151,11 @@ class ProfileActivity : ComponentActivity() {
                 Toast.makeText(this, "Profile picture updated", Toast.LENGTH_SHORT).show()
             }
             .addOnFailureListener { exception ->
-                Toast.makeText(this, "Failed to update profile picture: ${exception.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    this,
+                    "Failed to update profile picture: ${exception.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
             }
     }
 
@@ -163,14 +177,14 @@ fun ProfileScreen(
     followersCount: Int,
     followingCount: Int,
     onProfilePictureClick: () -> Unit,
-    onFollowersClick:() -> Unit,
-    onFollowingClick:() -> Unit,
+    onFollowersClick: () -> Unit,
+    onFollowingClick: () -> Unit,
     onLogoutClick: () -> Unit,
     navController: NavHostController
 ) {
     var name by remember { mutableStateOf(name) }
     var email by remember { mutableStateOf(email) }
-    var profilePictureUrl by remember { mutableStateOf(profilePictureUrl)}
+    var profilePictureUrl by remember { mutableStateOf(profilePictureUrl) }
     var followers by remember { mutableStateOf(followersCount) }
     var following by remember { mutableStateOf(followingCount) }
 
@@ -182,15 +196,18 @@ fun ProfileScreen(
             )
         },
         bottomBar = {
-            BottomNavigationBar(currentRoute = "profile", navController = navController, context = LocalContext.current)
+            BottomNavigationBar(
+                currentRoute = "profile",
+                navController = navController,
+                context = LocalContext.current
+            )
         }
     ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .fillMaxHeight()
-                .background(Color(0xFFF5F5F5)),
-            verticalArrangement = Arrangement.Top,
+                .padding(it)
+                .padding(8.dp)
+                .fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.height(24.dp))
@@ -227,14 +244,16 @@ fun ProfileScreen(
             Text(text = email, fontSize = 16.sp, color = Color.Gray)
             Spacer(modifier = Modifier.height(16.dp))
 
-            ElevatedButton(onClick = { /* Handle edit profile */ },
+            ElevatedButton(
+                onClick = { /* Handle edit profile */ },
                 modifier = Modifier
                     .fillMaxWidth(0.50f),
                 colors = ButtonColors(
                     containerColor = Color(0xFFE6F0E1),
                     contentColor = Color.Black,
                     disabledContainerColor = Color.Gray,
-                    disabledContentColor = Color.DarkGray)
+                    disabledContentColor = Color.DarkGray
+                )
             ) {
                 Text(text = "Edit Profile")
             }
@@ -299,9 +318,8 @@ fun ProfileScreen(
             }
             Spacer(modifier = Modifier.height(16.dp))
 
-            Button(
+            OutlinedButton(
                 onClick = { /* Handle published stories */ },
-                border = BorderStroke(1.dp, Color.Black),
                 modifier = Modifier
                     .fillMaxWidth()
                     .fillMaxHeight(0.20f)
@@ -311,7 +329,8 @@ fun ProfileScreen(
                     containerColor = Color(0xFF8BBF8C),
                     contentColor = Color.Black,
                     disabledContainerColor = Color.Gray,
-                    disabledContentColor = Color.DarkGray)
+                    disabledContentColor = Color.DarkGray
+                )
             ) {
                 Text(
                     text = "Published Stories",
@@ -321,8 +340,8 @@ fun ProfileScreen(
             }
             Spacer(modifier = Modifier.height(16.dp))
 
-            Button(onClick = { /* Handle reading list */ },
-                border = BorderStroke(1.dp, Color.Black),
+            OutlinedButton(
+                onClick = { /* Handle reading list */ },
                 modifier = Modifier
                     .fillMaxWidth()
                     .fillMaxHeight(0.25f)
@@ -332,7 +351,8 @@ fun ProfileScreen(
                     containerColor = Color(0xFF8BBF8C),
                     contentColor = Color.Black,
                     disabledContainerColor = Color.Gray,
-                    disabledContentColor = Color.DarkGray)
+                    disabledContentColor = Color.DarkGray
+                )
             ) {
                 Text(
                     text = "Reading List",
@@ -384,7 +404,12 @@ fun BottomNavigationBar(currentRoute: String, navController: NavHostController, 
             }
         )
         NavigationBarItem(
-            icon = { Icon(painterResource(id = R.drawable.ic_search), contentDescription = "Search") },
+            icon = {
+                Icon(
+                    painterResource(id = R.drawable.ic_search),
+                    contentDescription = "Search"
+                )
+            },
             selected = currentRoute == "search",
             onClick = {
                 val intent = Intent(context, SearchActivity::class.java)
@@ -392,7 +417,12 @@ fun BottomNavigationBar(currentRoute: String, navController: NavHostController, 
             }
         )
         NavigationBarItem(
-            icon = { Icon(painterResource(id = R.drawable.ic_create), contentDescription = "Create") },
+            icon = {
+                Icon(
+                    painterResource(id = R.drawable.ic_create),
+                    contentDescription = "Create"
+                )
+            },
             selected = currentRoute == "create",
             onClick = {
                 val intent = Intent(context, CreateStoryActivity::class.java)
@@ -400,7 +430,12 @@ fun BottomNavigationBar(currentRoute: String, navController: NavHostController, 
             }
         )
         NavigationBarItem(
-            icon = { Icon(painterResource(id = R.drawable.ic_profile), contentDescription = "Profile") },
+            icon = {
+                Icon(
+                    painterResource(id = R.drawable.ic_profile),
+                    contentDescription = "Profile"
+                )
+            },
             selected = currentRoute == "profile",
             onClick = { }
         )
@@ -506,8 +541,12 @@ fun UserProfileScreen(navController: NavHostController, userId: String) {
                 }
             }
             .addOnFailureListener { exception ->
-                scope.launch{}
-                Toast.makeText(context, "Failed to fetch user data: ${exception.message}", Toast.LENGTH_SHORT).show()
+                scope.launch {}
+                Toast.makeText(
+                    context,
+                    "Failed to fetch user data: ${exception.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
             }
     }
 

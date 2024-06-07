@@ -8,11 +8,29 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.ElevatedButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,7 +52,8 @@ class LoginActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        auth = Firebase.auth
+        auth = FirebaseAuth.getInstance()
+
         setContent {
             Theme {
                 LoginScreen(
@@ -58,7 +77,8 @@ class LoginActivity : ComponentActivity() {
             .addOnCompleteListener(this) { task ->
                 if (task.isSuccessful) {
                     if (rememberMe) {
-                        val sharedPreferences = getSharedPreferences("loginPrefs", Context.MODE_PRIVATE)
+                        val sharedPreferences =
+                            getSharedPreferences("loginPrefs", Context.MODE_PRIVATE)
                         with(sharedPreferences.edit()) {
                             putString("savedEmail", email)
                             apply()
@@ -67,8 +87,13 @@ class LoginActivity : ComponentActivity() {
                     Toast.makeText(baseContext, "Login Successful.", Toast.LENGTH_SHORT).show()
                     val intent = Intent(this, HomeActivity::class.java)
                     startActivity(intent)
+                    finish()
                 } else {
-                    Toast.makeText(baseContext, "Login failed: ${task.exception?.message}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(
+                        baseContext,
+                        "Login failed: ${task.exception?.message}",
+                        Toast.LENGTH_LONG
+                    ).show()
                 }
             }
     }
@@ -77,9 +102,14 @@ class LoginActivity : ComponentActivity() {
         auth.sendPasswordResetEmail(email)
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
-                    Toast.makeText(baseContext, "Password reset email sent.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(baseContext, "Password reset email sent.", Toast.LENGTH_SHORT)
+                        .show()
                 } else {
-                    Toast.makeText(baseContext, "Failed to send password reset email.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        baseContext,
+                        "Failed to send password reset email.",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             }
     }
@@ -220,7 +250,8 @@ fun LoginScreen(
                     if (email.isNotEmpty() && password.isNotEmpty()) {
                         onLoginClick(email, password, rememberMe)
                     } else {
-                        Toast.makeText(context, "Email or password is empty!!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Email or password is empty!!", Toast.LENGTH_SHORT)
+                            .show()
                     }
                 },
                 border = BorderStroke(1.dp, Color.Black),

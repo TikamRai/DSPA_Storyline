@@ -41,14 +41,23 @@ class SearchActivity : ComponentActivity() {
 
         setContent {
             val navController = rememberNavController()
-            SearchUserApp(navController, firestore)
+            Theme {
+                SearchApp(navController, firestore)
+            }
         }
+    }
+
+    override fun onBackPressed() {
+        super.onBackPressed()
+        val intent = Intent(this, HomeActivity::class.java)
+        startActivity(intent)
+        finish()
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SearchUserApp(navController: NavHostController, firestore: FirebaseFirestore) {
+fun SearchApp(navController: NavHostController, firestore: FirebaseFirestore) {
     val context = LocalContext.current
 
     Scaffold(
@@ -63,13 +72,13 @@ fun SearchUserApp(navController: NavHostController, firestore: FirebaseFirestore
         }
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
-            SearchUserScreen(navController, firestore)
+            SearchUserApp(navController, firestore)
         }
     }
 }
 
 @Composable
-fun SearchUserScreen(navController: NavHostController, firestore: FirebaseFirestore) {
+fun SearchUserApp(navController: NavHostController, firestore: FirebaseFirestore) {
     var query by remember { mutableStateOf("") }
     var searchResults by remember { mutableStateOf<List<User>>(emptyList()) }
     val context = LocalContext.current
@@ -100,16 +109,18 @@ fun SearchUserScreen(navController: NavHostController, firestore: FirebaseFirest
                     .background(Color.LightGray, CircleShape)
                     .padding(16.dp),
                 keyboardOptions = KeyboardOptions.Default.copy(autoCorrect = true),
-                textStyle = TextStyle(fontSize = 18.sp),
+                textStyle = TextStyle(fontSize = 16.sp),
                 keyboardActions = KeyboardActions.Default
             )
             Button(
                 onClick = {
-                    searchUsers(query, firestore, context) { users ->
-                        searchResults = users
+                    searchUser(query, firestore, context) { user ->
+                        searchResults = user
                     }
                 },
-                modifier = Modifier.padding(start = 8.dp)
+                modifier = Modifier
+                    .padding(start = 8.dp)
+                    .height(50.dp)
             ) {
                 Text("Search")
             }
@@ -138,7 +149,7 @@ fun SearchResultItem(user: User, navController: NavHostController) {
             painter = rememberAsyncImagePainter(user.profilePictureUrl),
             contentDescription = "Profile Picture",
             modifier = Modifier
-                .size(48.dp)
+                .size(50.dp)
                 .clip(CircleShape)
         )
 
@@ -153,7 +164,9 @@ fun SearchResultItem(user: User, navController: NavHostController) {
 
         Button(
             onClick = { /* Handle follow action */ },
-            modifier = Modifier.padding(start = 8.dp)
+            modifier = Modifier
+                .padding(start = 8.dp)
+                .height(50.dp)
         ) {
             Text("Follow")
         }
@@ -167,7 +180,12 @@ data class User(
     val profilePictureUrl: String?
 )
 
-fun searchUsers(query: String, firestore: FirebaseFirestore, context: android.content.Context, onResults: (List<User>) -> Unit) {
+fun searchUser(
+    query: String,
+    firestore: FirebaseFirestore,
+    context: android.content.Context,
+    onResults: (List<User>) -> Unit
+) {
     if (query.isBlank()) {
         onResults(emptyList())
         return
@@ -188,7 +206,8 @@ fun searchUsers(query: String, firestore: FirebaseFirestore, context: android.co
             onResults(users)
         }
         .addOnFailureListener { exception ->
-            Toast.makeText(context, "Error getting documents: $exception", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Error getting documents: $exception", Toast.LENGTH_SHORT)
+                .show()
         }
 }
 
@@ -211,12 +230,22 @@ fun BottomNavigationBar(currentRoute: String, navController: NavHostController) 
             }
         )
         NavigationBarItem(
-            icon = { Icon(painterResource(id = R.drawable.ic_search), contentDescription = "Search") },
+            icon = {
+                Icon(
+                    painterResource(id = R.drawable.ic_search),
+                    contentDescription = "Search"
+                )
+            },
             selected = currentRoute == "search",
             onClick = { }
         )
         NavigationBarItem(
-            icon = { Icon(painterResource(id = R.drawable.ic_create), contentDescription = "Create") },
+            icon = {
+                Icon(
+                    painterResource(id = R.drawable.ic_create),
+                    contentDescription = "Create"
+                )
+            },
             selected = currentRoute == "create",
             onClick = {
                 val intent = Intent(context, CreateStoryActivity::class.java)
@@ -224,7 +253,12 @@ fun BottomNavigationBar(currentRoute: String, navController: NavHostController) 
             }
         )
         NavigationBarItem(
-            icon = { Icon(painterResource(id = R.drawable.ic_profile), contentDescription = "Profile") },
+            icon = {
+                Icon(
+                    painterResource(id = R.drawable.ic_profile),
+                    contentDescription = "Profile"
+                )
+            },
             selected = currentRoute == "profile",
             onClick = {
                 val intent = Intent(context, ProfileActivity::class.java)
