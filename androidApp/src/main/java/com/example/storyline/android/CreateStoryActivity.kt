@@ -9,19 +9,41 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.*
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Divider
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -30,13 +52,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.focusModifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
@@ -45,13 +65,10 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import coil.compose.rememberImagePainter
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.lazy.items
-import coil.compose.rememberImagePainter
 
 class CreateStoryActivity : ComponentActivity() {
     private lateinit var auth: FirebaseAuth
@@ -86,10 +103,12 @@ class CreateStoryActivity : ComponentActivity() {
                     }
                     composable("edit_story_screen/{storyId}/{isDraft}") { backStackEntry ->
                         val storyId = backStackEntry.arguments?.getString("storyId")
-                        val isDraft = backStackEntry.arguments?.getString("isDraft")?.toBoolean() ?: false
+                        val isDraft =
+                            backStackEntry.arguments?.getString("isDraft")?.toBoolean() ?: false
                         EditStoryScreen(navController, storyId, firestore, storage, isDraft, auth)
                     }
-                    composable("story_part_editor_screen/{draftPartId}",
+                    composable(
+                        "story_part_editor_screen/{draftPartId}",
                         arguments = listOf(navArgument("draftPartId") { type = NavType.StringType })
                     ) { backStackEntry ->
                         val draftPartId = backStackEntry.arguments?.getString("draftPartId")
@@ -98,13 +117,6 @@ class CreateStoryActivity : ComponentActivity() {
                 }
             }
         }
-    }
-
-    override fun onBackPressed() {
-        super.onBackPressed()
-        val intent = Intent(this, HomeActivity::class.java)
-        startActivity(intent)
-        finish()
     }
 }
 
@@ -487,7 +499,8 @@ fun CreationScreen(
                                         .add(story)
                                         .addOnSuccessListener { documentReference ->
                                             Log.d(
-                                                "Firestore", "Story created with ID: ${documentReference.id}"
+                                                "Firestore",
+                                                "Story created with ID: ${documentReference.id}"
                                             )
                                             navController.navigate("story_editor_screen/${documentReference.id}")
                                         }
@@ -615,7 +628,8 @@ fun StoryEditorScreen(
                                 .add(storyPart)
                                 .addOnSuccessListener { documentReference ->
                                     Log.d(
-                                        "Firestore", "Story part saved with ID: ${documentReference.id}"
+                                        "Firestore",
+                                        "Story part saved with ID: ${documentReference.id}"
                                     )
                                     storyId?.let {
                                         val modifiedAt = com.google.firebase.Timestamp.now()
@@ -662,7 +676,8 @@ fun StoryEditorScreen(
                                     .add(storyPart)
                                     .addOnSuccessListener { documentReference ->
                                         Log.d(
-                                            "Firestore", "Story part published with ID: ${documentReference.id}"
+                                            "Firestore",
+                                            "Story part published with ID: ${documentReference.id}"
                                         )
                                         val publishedAt = com.google.firebase.Timestamp.now()
                                         val modifiedAt = com.google.firebase.Timestamp.now()
@@ -761,7 +776,8 @@ fun EditStoryScreen(
                 .orderBy("writtenAt", com.google.firebase.firestore.Query.Direction.ASCENDING)
                 .get()
                 .addOnSuccessListener { documents ->
-                    val partsList = documents.map { document -> document.data.apply { put("id", document.id) } }
+                    val partsList =
+                        documents.map { document -> document.data.apply { put("id", document.id) } }
                     draftParts = partsList
                 }
                 .addOnFailureListener { e ->
@@ -991,7 +1007,8 @@ fun EditStoryScreen(
                                             .get()
                                             .addOnSuccessListener { documents ->
                                                 for (document in documents) {
-                                                    firestore.collection("story_parts").document(document.id)
+                                                    firestore.collection("story_parts")
+                                                        .document(document.id)
                                                         .delete()
                                                 }
                                                 navController.navigate("create_screen") {
@@ -1133,7 +1150,10 @@ fun StoryPartEditorScreen(
                                     Log.d("Firestore", "Draft part saved with ID: $draftPartId")
                                     storyId?.let { id ->
                                         firestore.collection("stories").document(id)
-                                            .update("modifiedAt", com.google.firebase.Timestamp.now())
+                                            .update(
+                                                "modifiedAt",
+                                                com.google.firebase.Timestamp.now()
+                                            )
                                     }
                                     navController.popBackStack()
                                 }
@@ -1165,10 +1185,16 @@ fun StoryPartEditorScreen(
                                 firestore.collection("story_parts").document(id)
                                     .delete()
                                     .addOnSuccessListener {
-                                        Log.d("Firestore", "Draft part deleted with ID: $draftPartId")
+                                        Log.d(
+                                            "Firestore",
+                                            "Draft part deleted with ID: $draftPartId"
+                                        )
                                         storyId?.let { id ->
                                             firestore.collection("stories").document(id)
-                                                .update("modifiedAt", com.google.firebase.Timestamp.now())
+                                                .update(
+                                                    "modifiedAt",
+                                                    com.google.firebase.Timestamp.now()
+                                                )
                                         }
                                         navController.popBackStack()
                                     }
@@ -1274,21 +1300,23 @@ fun PublishedListScreen(
                                         .fillMaxWidth()
                                         .padding(8.dp)
                                         .clickable { navController.navigate("edit_story_screen/${story["id"]}/false") }
-                                        .background(Color.LightGray, RoundedCornerShape(8.dp))
-                                        .padding(16.dp)
+                                        .background(Color.LightGray, RoundedCornerShape(4.dp))
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Image(
                                             painter = rememberImagePainter(story["coverImageUrl"] as String),
                                             contentDescription = null,
                                             modifier = Modifier
-                                                .size(50.dp)
-                                                .background(Color.Gray, RoundedCornerShape(8.dp))
+                                                .size(120.dp)
+                                                .background(
+                                                    Color.LightGray,
+                                                    RoundedCornerShape(4.dp)
+                                                )
                                         )
-                                        Spacer(modifier = Modifier.width(16.dp))
+                                        Spacer(modifier = Modifier.width(10.dp))
                                         Text(
                                             text = story["title"] as String,
-                                            fontSize = 18.sp,
+                                            fontSize = 20.sp,
                                             fontWeight = FontWeight.Bold
                                         )
                                     }

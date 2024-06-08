@@ -2,15 +2,18 @@ package com.example.storyline.android
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -20,7 +23,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.rememberAsyncImagePainter
-import coil.compose.rememberImagePainter
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
 
 class HomeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -41,6 +46,44 @@ class HomeActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen() {
+    val firestore = remember { FirebaseFirestore.getInstance() }
+    val context = LocalContext.current
+
+    var stories by remember { mutableStateOf<List<Story>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        firestore.collection("stories")
+            .whereEqualTo("status", "published")
+            .orderBy("publishedAt", Query.Direction.DESCENDING)
+            .get()
+            .addOnSuccessListener { documents ->
+                val storyList = documents.mapNotNull { document ->
+                    try {
+                        val userId = document.getString("userId") ?: return@mapNotNull null
+                        val authorName = document.getString("author") ?: "Unknown"
+                        Story(
+                            id = document.id,
+                            title = document.getString("title") ?: "",
+                            imageUrl = document.getString("coverImageUrl") ?: "",
+                            author = authorName,
+                            createdAt = document.getTimestamp("createdAt") ?: com.google.firebase.Timestamp.now()
+                        )
+                    } catch (e: Exception) {
+                        Log.e("Firestore", "Error parsing story document", e)
+                        null
+                    }
+                }
+                stories = storyList
+                isLoading = false
+                Log.d("Firestore", "Published stories loaded: $storyList")
+            }
+            .addOnFailureListener { exception ->
+                Log.w("Firestore", "Error getting published stories: ", exception)
+                isLoading = false
+            }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -52,25 +95,36 @@ fun HomeScreen() {
             BottomNavigationBar(currentRoute = "home")
         }
     ) { paddingValues ->
-        LazyColumn(
-            contentPadding = paddingValues,
-            modifier = Modifier.padding(16.dp)
-        ) {
-            items(stories) { story ->
-                StoryItem(story)
-                Spacer(modifier = Modifier.height(16.dp))
+        if (isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        } else {
+            LazyColumn(
+                contentPadding = paddingValues,
+                modifier = Modifier.padding(16.dp)
+            ) {
+                items(stories) { story ->
+                    StoryItem(story = story, onClick = {
+                        //val intent = Intent(context, StoryDetailActivity::class.java)
+                        //intent.putExtra("storyId", story.id)
+                        //context.startActivity(intent)
+                    })
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
             }
         }
     }
 }
 
 @Composable
-fun StoryItem(story: Story) {
+fun StoryItem(story: Story, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(Color(0xFFF5F5F5))
             .padding(8.dp)
+            .clickable(onClick = onClick)
     ) {
         Image(
             painter = rememberAsyncImagePainter(model = story.imageUrl),
@@ -83,13 +137,17 @@ fun StoryItem(story: Story) {
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = story.title,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier
+            .padding(start = 4.dp)
         )
         Text(
             text = story.author,
-            fontSize = 14.sp,
-            color = Color.Gray
+            fontSize = 16.sp,
+            color = Color.Gray,
+            modifier = Modifier
+                .padding(start = 4.dp)
         )
     }
 }
@@ -151,11 +209,10 @@ fun BottomNavigationBar(currentRoute: String) {
     }
 }
 
-val stories = listOf(
-    Story("The Book of Good and Evil", "John Green", "https://example.com/image1.jpg"),
-    Story("The Dragon's Tale", "Jane Doe", "https://example.com/image2.jpg"),
-    Story("The Dragon's Tale", "Jane Doe", "https://example.com/image2.jpg"),
-    Story("The Dragon's Tale", "Jane Doe", "https://example.com/image2.jpg")
+data class Story(
+    val id: String,
+    val title: String,
+    val author: String,
+    val imageUrl: String,
+    val createdAt: com.google.firebase.Timestamp
 )
-
-data class Story(val title: String, val author: String, val imageUrl: String)
