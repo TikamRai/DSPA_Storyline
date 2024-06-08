@@ -79,21 +79,21 @@ class CreateStoryActivity : ComponentActivity() {
                         arguments = listOf(navArgument("storyId") { type = NavType.StringType })
                     ) { backStackEntry ->
                         val storyId = backStackEntry.arguments?.getString("storyId")
-                        TextEditorScreen(navController, storyId, firestore)
+                        StoryEditorScreen(navController, storyId, firestore)
                     }
-                    composable(
-                        "edit_draft_screen/{draftId}",
-                        arguments = listOf(navArgument("draftId") { type = NavType.StringType })
-                    ) { backStackEntry ->
-                        val draftId = backStackEntry.arguments?.getString("draftId")
-                        EditDraftScreen(navController, draftId, firestore, storage)
+                    composable("published_list_screen") {
+                        PublishedListScreen(navController, auth, firestore)
                     }
-                    composable(
-                        "draft_part_editor_screen/{draftPartId}",
+                    composable("edit_story_screen/{storyId}/{isDraft}") { backStackEntry ->
+                        val storyId = backStackEntry.arguments?.getString("storyId")
+                        val isDraft = backStackEntry.arguments?.getString("isDraft")?.toBoolean() ?: false
+                        EditStoryScreen(navController, storyId, firestore, storage, isDraft, auth)
+                    }
+                    composable("story_part_editor_screen/{draftPartId}",
                         arguments = listOf(navArgument("draftPartId") { type = NavType.StringType })
                     ) { backStackEntry ->
                         val draftPartId = backStackEntry.arguments?.getString("draftPartId")
-                        DraftPartEditorScreen(navController, draftPartId, firestore)
+                        StoryPartEditorScreen(navController, draftPartId, firestore)
                     }
                 }
             }
@@ -116,25 +116,38 @@ fun CreateScreen(
     firestore: FirebaseFirestore,
     storage: FirebaseStorage
 ) {
-    val currentUser = auth.currentUser
+    val currentUser = auth.currentUser?.uid
     val drafts = remember { mutableStateOf<List<Map<String, Any>>>(emptyList()) }
+    val isLoading = remember { mutableStateOf(true) }
 
     LaunchedEffect(currentUser) {
-        currentUser?.let { user ->
+        if (currentUser != null) {
+            Log.d("Firestore", "Current user ID: $currentUser")
             firestore.collection("stories")
-                .whereEqualTo("userId", user.uid)
+                .whereEqualTo("userId", currentUser)
                 .whereEqualTo("status", "draft")
                 .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.ASCENDING)
                 .get()
                 .addOnSuccessListener { documents ->
-                    val draftList = documents.map { document ->
-                        document.data.apply { put("id", document.id) }
+                    Log.d("Firestore", "Documents retrieved: ${documents.size()}")
+                    if (documents.isEmpty) {
+                        Log.d("Firestore", "No drafts found for the user")
+                    } else {
+                        val draftList = documents.map { document ->
+                            document.data.apply { put("id", document.id) }
+                        }
+                        drafts.value = draftList
+                        Log.d("Firestore", "Drafts loaded successfully: $draftList")
                     }
-                    drafts.value = draftList
+                    isLoading.value = false
                 }
                 .addOnFailureListener { exception ->
                     Log.w("Firestore", "Error getting drafts: ", exception)
+                    isLoading.value = false
                 }
+        } else {
+            Log.w("Firestore", "No current user logged in")
+            isLoading.value = false
         }
     }
 
@@ -172,7 +185,7 @@ fun CreateScreen(
             }
 
             OutlinedButton(
-                onClick = { /* Navigate to Edit Published Stories page */ },
+                onClick = { navController.navigate("published_list_screen") },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(100.dp)
@@ -195,34 +208,38 @@ fun CreateScreen(
                     .padding(start = 8.dp, top = 16.dp, bottom = 8.dp)
             )
 
-            LazyColumn(
-                modifier = Modifier.fillMaxHeight(0.99f)
-            ) {
-                items(drafts.value) { draft ->
-                    OutlinedButton(
-                        onClick = { navController.navigate("draft_editor_screen/${draft["id"]}") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(88.dp)
-                            .padding(6.dp),
-                        shape = RoundedCornerShape(2.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFD3D3D3),
-                            contentColor = Color.Black
-                        )
+            if (isLoading.value) {
+                CircularProgressIndicator(modifier = Modifier.padding(16.dp))
+            } else {
+                if (drafts.value.isEmpty()) {
+                    Text(
+                        text = "No drafts available",
+                        fontSize = 16.sp,
+                        color = Color.Gray,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxHeight(0.99f)
                     ) {
-                        Text(text = draft["title"] as String, fontSize = 16.sp)
+                        items(drafts.value) { draft ->
+                            OutlinedButton(
+                                onClick = { navController.navigate("edit_story_screen/${draft["id"]}/true") },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(88.dp)
+                                    .padding(6.dp),
+                                shape = RoundedCornerShape(2.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFD3D3D3),
+                                    contentColor = Color.Black
+                                )
+                            ) {
+                                Text(text = draft["title"] as String, fontSize = 16.sp)
+                            }
+                        }
                     }
                 }
-            }
-
-            if (drafts.value.isEmpty()) {
-                Text(
-                    text = "No drafts available",
-                    fontSize = 16.sp,
-                    color = Color.Gray,
-                    modifier = Modifier.padding(16.dp)
-                )
             }
         }
     }
@@ -462,14 +479,15 @@ fun CreationScreen(
                                         "category" to category.text,
                                         "coverImageUrl" to downloadUri.toString(),
                                         "userId" to (currentUser?.uid ?: ""),
-                                        "status" to "draft"
+                                        "status" to "draft",
+                                        "createdAt" to com.google.firebase.Timestamp.now(),
+                                        "modifiedAt" to com.google.firebase.Timestamp.now()
                                     )
                                     firestore.collection("stories")
                                         .add(story)
                                         .addOnSuccessListener { documentReference ->
                                             Log.d(
-                                                "Firestore",
-                                                "Story created with ID: ${documentReference.id}"
+                                                "Firestore", "Story created with ID: ${documentReference.id}"
                                             )
                                             navController.navigate("story_editor_screen/${documentReference.id}")
                                         }
@@ -507,7 +525,7 @@ fun CreationScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TextEditorScreen(
+fun StoryEditorScreen(
     navController: NavHostController,
     storyId: String?,
     firestore: FirebaseFirestore
@@ -555,7 +573,7 @@ fun TextEditorScreen(
                     )
                 )
 
-                HorizontalDivider(thickness = 1.dp, color = Color.Gray)
+                Divider(thickness = 1.dp, color = Color.Gray)
 
                 TextField(
                     value = storyContent,
@@ -590,21 +608,26 @@ fun TextEditorScreen(
                             val storyPart = hashMapOf(
                                 "title" to storyPartTitle.text,
                                 "content" to storyContent.text,
-                                "storyId" to storyId
+                                "storyId" to storyId,
+                                "writtenAt" to com.google.firebase.Timestamp.now()
                             )
                             firestore.collection("story_parts")
                                 .add(storyPart)
                                 .addOnSuccessListener { documentReference ->
                                     Log.d(
-                                        "Firestore",
-                                        "Draft saved with ID: ${documentReference.id}"
+                                        "Firestore", "Story part saved with ID: ${documentReference.id}"
                                     )
+                                    storyId?.let {
+                                        val modifiedAt = com.google.firebase.Timestamp.now()
+                                        firestore.collection("stories").document(it)
+                                            .update("modifiedAt", modifiedAt)
+                                    }
                                     navController.navigate("create_screen") {
                                         popUpTo("create_screen") { inclusive = true }
                                     }
                                 }
                                 .addOnFailureListener { e ->
-                                    Log.w("Firestore", "Error saving draft", e)
+                                    Log.w("Firestore", "Error saving story part", e)
                                 }
                         },
                         modifier = Modifier
@@ -628,28 +651,43 @@ fun TextEditorScreen(
 
                     OutlinedButton(
                         onClick = {
-                            val storyPart = hashMapOf(
-                                "title" to storyPartTitle.text,
-                                "content" to storyContent.text,
-                                "storyId" to storyId,
-                            )
-                            val story = hashMapOf(
-                                "status" to "published"
-                            )
-                            firestore.collection("story_parts")
-                                .add(storyPart)
-                                .addOnSuccessListener { documentReference ->
-                                    Log.d(
-                                        "Firestore",
-                                        "Story part published with ID: ${documentReference.id}"
-                                    )
-                                    navController.navigate("create_screen") {
-                                        popUpTo("create_screen") { inclusive = true }
+                            if (storyId != null) {
+                                val storyPart = hashMapOf(
+                                    "title" to storyPartTitle.text,
+                                    "content" to storyContent.text,
+                                    "storyId" to storyId,
+                                    "writtenAt" to com.google.firebase.Timestamp.now()
+                                )
+                                firestore.collection("story_parts")
+                                    .add(storyPart)
+                                    .addOnSuccessListener { documentReference ->
+                                        Log.d(
+                                            "Firestore", "Story part published with ID: ${documentReference.id}"
+                                        )
+                                        val publishedAt = com.google.firebase.Timestamp.now()
+                                        val modifiedAt = com.google.firebase.Timestamp.now()
+                                        firestore.collection("stories").document(storyId)
+                                            .update(
+                                                mapOf(
+                                                    "status" to "published",
+                                                    "publishedAt" to publishedAt,
+                                                    "modifiedAt" to modifiedAt
+                                                )
+                                            )
+                                            .addOnSuccessListener {
+                                                Log.d("Firestore", "Story published")
+                                                navController.navigate("create_screen") {
+                                                    popUpTo("create_screen") { inclusive = true }
+                                                }
+                                            }
+                                            .addOnFailureListener { e ->
+                                                Log.w("Firestore", "Error publishing story", e)
+                                            }
                                     }
-                                }
-                                .addOnFailureListener { e ->
-                                    Log.w("Firestore", "Error publishing story part", e)
-                                }
+                                    .addOnFailureListener { e ->
+                                        Log.w("Firestore", "Error publishing story part", e)
+                                    }
+                            }
                         },
                         modifier = Modifier
                             .weight(1f)
@@ -677,17 +715,22 @@ fun TextEditorScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EditDraftScreen(
+fun EditStoryScreen(
     navController: NavHostController,
-    draftId: String?,
+    storyId: String?,
     firestore: FirebaseFirestore,
-    storage: FirebaseStorage
+    storage: FirebaseStorage,
+    isDraft: Boolean,
+    auth: FirebaseAuth
 ) {
+    val currentUser = auth.currentUser?.uid
     var storyCoverUri by remember { mutableStateOf<Uri?>(null) }
+    var oldCoverImageUrl by remember { mutableStateOf<String?>(null) }
     var title by remember { mutableStateOf(TextFieldValue()) }
     var description by remember { mutableStateOf(TextFieldValue()) }
     var tags by remember { mutableStateOf(TextFieldValue()) }
     var category by remember { mutableStateOf(TextFieldValue()) }
+    var createdAt by remember { mutableStateOf<com.google.firebase.Timestamp?>(null) }
     var draftParts by remember { mutableStateOf<List<Map<String, Any>>>(emptyList()) }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
@@ -695,8 +738,8 @@ fun EditDraftScreen(
         onResult = { uri: Uri? -> storyCoverUri = uri }
     )
 
-    LaunchedEffect(draftId) {
-        draftId?.let {
+    LaunchedEffect(storyId) {
+        storyId?.let {
             firestore.collection("stories").document(it).get()
                 .addOnSuccessListener { document ->
                     document?.let {
@@ -704,16 +747,25 @@ fun EditDraftScreen(
                         description = TextFieldValue(document.getString("description") ?: "")
                         tags = TextFieldValue(document.getString("tags") ?: "")
                         category = TextFieldValue(document.getString("category") ?: "")
-                        storyCoverUri = Uri.parse(document.getString("coverImageUrl"))
+                        oldCoverImageUrl = document.getString("coverImageUrl")
+                        storyCoverUri = oldCoverImageUrl?.let { Uri.parse(it) }
+                        createdAt = document.getTimestamp("createdAt")
                     }
+                }
+                .addOnFailureListener { e ->
+                    Log.w("Firestore", "Error retrieving story details", e)
                 }
 
             firestore.collection("story_parts")
                 .whereEqualTo("storyId", it)
+                .orderBy("writtenAt", com.google.firebase.firestore.Query.Direction.ASCENDING)
                 .get()
                 .addOnSuccessListener { documents ->
-                    val partsList = documents.map { document -> document.data }
+                    val partsList = documents.map { document -> document.data.apply { put("id", document.id) } }
                     draftParts = partsList
+                }
+                .addOnFailureListener { e ->
+                    Log.w("Firestore", "Error retrieving story parts", e)
                 }
         }
     }
@@ -721,7 +773,7 @@ fun EditDraftScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Edit Story") },
+                title = { Text(if (isDraft) "Edit Draft" else "Edit Story") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -735,13 +787,13 @@ fun EditDraftScreen(
                     .padding(paddingValues)
                     .padding(16.dp)
                     .fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp),
             ) {
                 Box(
                     modifier = Modifier
                         .background(Color.LightGray)
                         .fillMaxWidth()
-                        .height(150.dp)
+                        .height(100.dp)
                         .clickable { imagePickerLauncher.launch("image/*") },
                     contentAlignment = Alignment.Center
                 ) {
@@ -754,9 +806,7 @@ fun EditDraftScreen(
                     } ?: Text("Change Story Cover")
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Text(text = "Story Title", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text(text = "Story Title", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 TextField(
                     value = title,
                     onValueChange = { title = it },
@@ -770,11 +820,14 @@ fun EditDraftScreen(
                     )
                 )
 
-                Text(text = "Story Description", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text(text = "Story Description", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 TextField(
                     value = description,
                     onValueChange = { description = it },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(80.dp),
+                    maxLines = 5,
                     colors = TextFieldDefaults.colors(
                         unfocusedContainerColor = Color.LightGray,
                         focusedContainerColor = Color.LightGray,
@@ -784,7 +837,7 @@ fun EditDraftScreen(
                     )
                 )
 
-                Text(text = "Tags", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text(text = "Tags", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 TextField(
                     value = tags,
                     onValueChange = { tags = it },
@@ -798,7 +851,7 @@ fun EditDraftScreen(
                     )
                 )
 
-                Text(text = "Story Category", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text(text = "Story Category", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 TextField(
                     value = category,
                     onValueChange = { category = it },
@@ -812,8 +865,6 @@ fun EditDraftScreen(
                     )
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
-
                 Text(
                     text = "Draft Parts",
                     fontSize = 20.sp,
@@ -821,15 +872,18 @@ fun EditDraftScreen(
                     modifier = Modifier.align(Alignment.Start)
                 )
 
-                LazyColumn(modifier = Modifier.fillMaxHeight(0.99f)) {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxHeight(0.54f)
+                ) {
                     items(draftParts.size) { index ->
                         val draftPart = draftParts[index]
                         OutlinedButton(
-                            onClick = { navController.navigate("draft_editor_screen/${draftPart["id"]}") },
+                            onClick = { navController.navigate("story_part_editor_screen/${draftPart["id"]}") },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(88.dp)
-                                .padding(6.dp),
+                                .height(40.dp)
+                                .padding(top = 2.dp),
                             shape = RoundedCornerShape(2.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color(0xFFD3D3D3),
@@ -841,19 +895,22 @@ fun EditDraftScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
                 OutlinedButton(
                     onClick = {
                         val newPart = hashMapOf(
                             "title" to "",
                             "content" to "",
-                            "storyId" to draftId
+                            "storyId" to storyId,
+                            "writtenAt" to com.google.firebase.Timestamp.now()
                         )
                         firestore.collection("story_parts")
                             .add(newPart)
                             .addOnSuccessListener { documentReference ->
-                                navController.navigate("draft_editor_screen/${documentReference.id}")
+                                firestore.collection("stories").document(storyId ?: "")
+                                    .update("modifiedAt", com.google.firebase.Timestamp.now())
+                                    .addOnSuccessListener {
+                                        navController.navigate("story_part_editor_screen/${documentReference.id}")
+                                    }
                             }
                             .addOnFailureListener { e ->
                                 Log.w("Firestore", "Error adding new part", e)
@@ -861,8 +918,7 @@ fun EditDraftScreen(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(88.dp)
-                        .padding(6.dp),
+                        .height(50.dp),
                     shape = RoundedCornerShape(2.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color.LightGray,
@@ -872,56 +928,99 @@ fun EditDraftScreen(
                     Text(text = "+ Add New Part", fontSize = 16.sp)
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.weight(1f))
 
-                OutlinedButton(
-                    onClick = {
-                        storyCoverUri?.let { uri ->
-                            val storageRef =
-                                storage.reference.child("story_covers/${draftId}_${System.currentTimeMillis()}.jpg")
-                            val uploadTask = storageRef.putFile(uri)
-                            uploadTask.addOnSuccessListener {
-                                storageRef.downloadUrl.addOnSuccessListener { downloadUri ->
-                                    val story = hashMapOf(
-                                        "title" to title.text,
-                                        "description" to description.text,
-                                        "tags" to tags.text,
-                                        "category" to category.text,
-                                        "coverUrl" to downloadUri.toString(),
-                                        "status" to "published"
-                                    )
-                                    firestore.collection("stories").document(draftId ?: "")
-                                        .set(story)
-                                        .addOnSuccessListener {
-                                            Log.d("Firestore", "Story published with ID: $draftId")
-                                            navController.navigate("create_screen") {
-                                                popUpTo("create_screen") { inclusive = true }
-                                            }
-                                        }
-                                        .addOnFailureListener { e ->
-                                            Log.w("Firestore", "Error publishing story", e)
-                                        }
-                                }
-                            }
-                        }
-                    },
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(80.dp)
-                        .align(Alignment.CenterHorizontally),
-                    shape = RoundedCornerShape(0.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.LightGray,
-                        contentColor = Color.Black,
-                        disabledContainerColor = Color.Gray,
-                        disabledContentColor = Color.DarkGray
-                    )
+                        .height(50.dp)
                 ) {
-                    Text(
-                        text = "Publish",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    OutlinedButton(
+                        onClick = {
+                            val finalCoverImageUrl = storyCoverUri?.toString() ?: oldCoverImageUrl
+                            val story = hashMapOf(
+                                "title" to title.text,
+                                "description" to description.text,
+                                "tags" to tags.text,
+                                "category" to category.text,
+                                "coverImageUrl" to finalCoverImageUrl,
+                                "status" to "published",
+                                "publishedAt" to com.google.firebase.Timestamp.now(),
+                                "modifiedAt" to com.google.firebase.Timestamp.now(),
+                                "createdAt" to createdAt,  // Use the original createdAt
+                                "userId" to (currentUser ?: "")  // Ensure userId is added
+                            )
+                            firestore.collection("stories").document(storyId ?: "")
+                                .set(story)
+                                .addOnSuccessListener {
+                                    Log.d("Firestore", "Story published with ID: $storyId")
+                                    navController.navigate("create_screen") {
+                                        popUpTo("create_screen") { inclusive = true }
+                                    }
+                                }
+                                .addOnFailureListener { e ->
+                                    Log.w("Firestore", "Error publishing story", e)
+                                }
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 4.dp),
+                        shape = RoundedCornerShape(0.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.LightGray,
+                            contentColor = Color.Black,
+                            disabledContainerColor = Color.Gray,
+                            disabledContentColor = Color.DarkGray
+                        )
+                    ) {
+                        Text(
+                            text = "Publish",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            storyId?.let { id ->
+                                firestore.collection("stories").document(id)
+                                    .delete()
+                                    .addOnSuccessListener {
+                                        firestore.collection("story_parts")
+                                            .whereEqualTo("storyId", id)
+                                            .get()
+                                            .addOnSuccessListener { documents ->
+                                                for (document in documents) {
+                                                    firestore.collection("story_parts").document(document.id)
+                                                        .delete()
+                                                }
+                                                navController.navigate("create_screen") {
+                                                    popUpTo("create_screen") { inclusive = true }
+                                                }
+                                            }
+                                    }
+                                    .addOnFailureListener { e ->
+                                        Log.w("Firestore", "Error deleting story", e)
+                                    }
+                            }
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(start = 4.dp),
+                        shape = RoundedCornerShape(0.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Red,
+                            contentColor = Color.White,
+                            disabledContainerColor = Color.Gray,
+                            disabledContentColor = Color.DarkGray
+                        )
+                    ) {
+                        Text(
+                            text = "Delete",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }
@@ -930,7 +1029,7 @@ fun EditDraftScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DraftPartEditorScreen(
+fun StoryPartEditorScreen(
     navController: NavHostController,
     draftPartId: String?,
     firestore: FirebaseFirestore
@@ -939,6 +1038,7 @@ fun DraftPartEditorScreen(
     var draftPartContent by remember { mutableStateOf(TextFieldValue()) }
     var isTitleAvailable by remember { mutableStateOf(false) }
     var isContentAvailable by remember { mutableStateOf(false) }
+    var storyId by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(draftPartId) {
         draftPartId?.let {
@@ -951,6 +1051,7 @@ fun DraftPartEditorScreen(
                         draftPartContent = TextFieldValue(content)
                         isTitleAvailable = title.isNotEmpty()
                         isContentAvailable = content.isNotEmpty()
+                        storyId = document.getString("storyId")
                     }
                 }
         }
@@ -959,7 +1060,7 @@ fun DraftPartEditorScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Edit Draft Part") },
+                title = { Text("Write") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -983,11 +1084,11 @@ fun DraftPartEditorScreen(
                         .fillMaxWidth()
                         .background(Color.White),
                     colors = TextFieldDefaults.colors(
-                        unfocusedContainerColor = Color.LightGray,
-                        focusedContainerColor = Color.LightGray,
+                        unfocusedContainerColor = Color.White,
+                        focusedContainerColor = Color.White,
                         cursorColor = Color.Black,
-                        unfocusedIndicatorColor = Color.LightGray,
-                        focusedIndicatorColor = Color.LightGray
+                        unfocusedIndicatorColor = Color.White,
+                        focusedIndicatorColor = Color.White
                     )
                 )
 
@@ -1002,50 +1103,199 @@ fun DraftPartEditorScreen(
                         .weight(1f)
                         .background(Color.White),
                     colors = TextFieldDefaults.colors(
-                        unfocusedContainerColor = Color.LightGray,
-                        focusedContainerColor = Color.LightGray,
+                        unfocusedContainerColor = Color.White,
+                        focusedContainerColor = Color.White,
                         cursorColor = Color.Black,
-                        unfocusedIndicatorColor = Color.LightGray,
-                        focusedIndicatorColor = Color.LightGray
+                        unfocusedIndicatorColor = Color.White,
+                        focusedIndicatorColor = Color.White
                     )
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                OutlinedButton(
-                    onClick = {
-                        val draftPart = hashMapOf(
-                            "title" to draftPartTitle.text,
-                            "content" to draftPartContent.text,
-                            "storyId" to draftPartId
-                        )
-                        firestore.collection("story_parts").document(draftPartId ?: "")
-                            .set(draftPart)
-                            .addOnSuccessListener {
-                                Log.d("Firestore", "Draft part saved with ID: $draftPartId")
-                                navController.popBackStack() // Navigate back to EditDraftScreen
-                            }
-                            .addOnFailureListener { e ->
-                                Log.w("Firestore", "Error saving draft part", e)
-                            }
-                    },
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 16.dp)
                         .height(60.dp),
-                    shape = RoundedCornerShape(0.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.LightGray,
-                        contentColor = Color.Black,
-                        disabledContainerColor = Color.Gray,
-                        disabledContentColor = Color.DarkGray
-                    )
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(
-                        text = "Save",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    OutlinedButton(
+                        onClick = {
+                            val draftPart = hashMapOf(
+                                "title" to draftPartTitle.text,
+                                "content" to draftPartContent.text,
+                                "storyId" to storyId,
+                                "writtenAt" to com.google.firebase.Timestamp.now()
+                            )
+                            firestore.collection("story_parts").document(draftPartId ?: "")
+                                .set(draftPart)
+                                .addOnSuccessListener {
+                                    Log.d("Firestore", "Draft part saved with ID: $draftPartId")
+                                    storyId?.let { id ->
+                                        firestore.collection("stories").document(id)
+                                            .update("modifiedAt", com.google.firebase.Timestamp.now())
+                                    }
+                                    navController.popBackStack()
+                                }
+                                .addOnFailureListener { e ->
+                                    Log.w("Firestore", "Error saving draft part", e)
+                                }
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 4.dp),
+                        shape = RoundedCornerShape(0.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.LightGray,
+                            contentColor = Color.Black,
+                            disabledContainerColor = Color.Gray,
+                            disabledContentColor = Color.DarkGray
+                        )
+                    ) {
+                        Text(
+                            text = "Save",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            draftPartId?.let { id ->
+                                firestore.collection("story_parts").document(id)
+                                    .delete()
+                                    .addOnSuccessListener {
+                                        Log.d("Firestore", "Draft part deleted with ID: $draftPartId")
+                                        storyId?.let { id ->
+                                            firestore.collection("stories").document(id)
+                                                .update("modifiedAt", com.google.firebase.Timestamp.now())
+                                        }
+                                        navController.popBackStack()
+                                    }
+                                    .addOnFailureListener { e ->
+                                        Log.w("Firestore", "Error deleting draft part", e)
+                                    }
+                            }
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(start = 4.dp),
+                        shape = RoundedCornerShape(0.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Red,
+                            contentColor = Color.White,
+                            disabledContainerColor = Color.Gray,
+                            disabledContentColor = Color.DarkGray
+                        )
+                    ) {
+                        Text(
+                            text = "Delete",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PublishedListScreen(
+    navController: NavHostController,
+    auth: FirebaseAuth,
+    firestore: FirebaseFirestore
+) {
+    val currentUser = auth.currentUser?.uid
+    val publishedStories = remember { mutableStateOf<List<Map<String, Any>>>(emptyList()) }
+    val isLoading = remember { mutableStateOf(true) }
+
+    LaunchedEffect(currentUser) {
+        if (currentUser != null) {
+            firestore.collection("stories")
+                .whereEqualTo("userId", currentUser)
+                .whereEqualTo("status", "published")
+                .get()
+                .addOnSuccessListener { documents ->
+                    val storyList = documents.map { document ->
+                        document.data.apply { put("id", document.id) }
+                    }
+                    publishedStories.value = storyList
+                    isLoading.value = false
+                    Log.d("Firestore", "Published stories loaded: $storyList")
+                }
+                .addOnFailureListener { exception ->
+                    Log.w("Firestore", "Error getting published stories: ", exception)
+                    isLoading.value = false
+                }
+        } else {
+            Log.w("Firestore", "No current user logged in")
+            isLoading.value = false
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Edit Published Stories") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        },
+        content = { paddingValues ->
+            Column(
+                modifier = Modifier
+                    .padding(paddingValues)
+                    .padding(8.dp)
+                    .fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                if (isLoading.value) {
+                    CircularProgressIndicator(modifier = Modifier.padding(16.dp))
+                } else {
+                    if (publishedStories.value.isEmpty()) {
+                        Text(
+                            text = "No published stories available",
+                            fontSize = 16.sp,
+                            color = Color.Gray,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxHeight()
+                        ) {
+                            items(publishedStories.value) { story ->
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(8.dp)
+                                        .clickable { navController.navigate("edit_story_screen/${story["id"]}/false") }
+                                        .background(Color.LightGray, RoundedCornerShape(8.dp))
+                                        .padding(16.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Image(
+                                            painter = rememberImagePainter(story["coverImageUrl"] as String),
+                                            contentDescription = null,
+                                            modifier = Modifier
+                                                .size(50.dp)
+                                                .background(Color.Gray, RoundedCornerShape(8.dp))
+                                        )
+                                        Spacer(modifier = Modifier.width(16.dp))
+                                        Text(
+                                            text = story["title"] as String,
+                                            fontSize = 18.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
