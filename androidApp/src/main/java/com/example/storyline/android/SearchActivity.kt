@@ -47,6 +47,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
@@ -98,10 +99,9 @@ fun SearchApp(navController: NavHostController, firestore: FirebaseFirestore) {
         }
     }
 }
-
 @Composable
 fun SearchUserApp(navController: NavHostController, firestore: FirebaseFirestore) {
-    var query by remember { mutableStateOf("") }
+    var query by remember { mutableStateOf(TextFieldValue()) }
     var searchResults by remember { mutableStateOf<List<User>>(emptyList()) }
     val context = LocalContext.current
 
@@ -125,7 +125,12 @@ fun SearchUserApp(navController: NavHostController, firestore: FirebaseFirestore
         ) {
             BasicTextField(
                 value = query,
-                onValueChange = { query = it },
+                onValueChange = {
+                    query = it
+                    searchUser(it.text, firestore, context) { user ->
+                        searchResults = user
+                    }
+                },
                 modifier = Modifier
                     .weight(1f)
                     .background(Color.LightGray, CircleShape)
@@ -135,11 +140,7 @@ fun SearchUserApp(navController: NavHostController, firestore: FirebaseFirestore
                 keyboardActions = KeyboardActions.Default
             )
             Button(
-                onClick = {
-                    searchUser(query, firestore, context) { user ->
-                        searchResults = user
-                    }
-                },
+                onClick = { },
                 modifier = Modifier
                     .padding(start = 8.dp)
                     .height(50.dp)
@@ -157,6 +158,7 @@ fun SearchUserApp(navController: NavHostController, firestore: FirebaseFirestore
         }
     }
 }
+
 
 @Composable
 fun SearchResultItem(user: User, navController: NavHostController) {
