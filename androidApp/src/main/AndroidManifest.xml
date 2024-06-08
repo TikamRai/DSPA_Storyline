@@ -27,6 +27,7 @@
         <activity android:name=".SearchActivity"/>
         <activity android:name=".CreateStoryActivity" />
         <activity android:name=".ProfileActivity" />
+        <activity android:name=".SearchedUserProfile"/>
 
     </application>
 </manifest> 

@@ -1,7 +1,9 @@
 package com.example.storyline.android
 
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -37,6 +39,10 @@ class SearchActivity : ComponentActivity() {
 
         setContent {
             val navController = rememberNavController()
+            navController.addOnDestinationChangedListener { controller, destination, arguments ->
+                Log.d("Navigation", "Destination changed to: ${destination.route}")
+            }
+
             Theme {
                 SearchApp(navController, firestore)
             }
@@ -122,24 +128,30 @@ fun SearchUserApp(navController: NavHostController, firestore: FirebaseFirestore
 
         LazyColumn {
             items(searchResults) { user ->
-                SearchResultItem(user = user) {
-                    navController.navigate("searchedUserProfile/${user.uid}")
+                SearchResultItem(context, user) {
                 }
             }
         }
+
+
     }
 }
 
 @Composable
-fun SearchResultItem(user: User, onUserClicked: () -> Unit) {
-    val navController = rememberNavController()
-
+fun SearchResultItem(context: Context, user: User, onUserClicked: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp)
             .clickable {
-                navController.navigate("searchedUserProfile/${user.uid}")
+                val intent = Intent(context, SearchedUserProfile::class.java)
+                intent.putExtra("userId", user.uid)
+                try {
+                    context.startActivity(intent)
+                } catch (e: Exception) {
+                    Log.e("SearchResultItem", "Error starting activity: ${e.message}")
+                    Toast.makeText(context, "Error opening user profile", Toast.LENGTH_SHORT).show()
+                }
             },
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -156,6 +168,8 @@ fun SearchResultItem(user: User, onUserClicked: () -> Unit) {
         Text(text = user.name)
     }
 }
+
+
 
 data class User(
     val uid: String,
