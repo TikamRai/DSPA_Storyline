@@ -10,7 +10,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -26,18 +28,22 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavHost
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.*
 import coil.compose.rememberAsyncImagePainter
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import kotlinx.coroutines.flow.filter
 
 class HomeActivity : ComponentActivity() {
+    private lateinit var navController: NavHostController
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
+            val navController = rememberNavController()
             Theme {
-                val navController = rememberNavController()
                 NavHost(navController, startDestination = "home") {
                     composable("home") { HomeScreen(navController) }
                     composable("story_detail/{storyId}") { backStackEntry ->
@@ -49,8 +55,15 @@ class HomeActivity : ComponentActivity() {
     }
 
     override fun onBackPressed() {
-        super.onBackPressed()
-        finishAffinity()
+        if (::navController.isInitialized && navController.currentDestination?.route == "home") {
+            finishAffinity()
+        } else {
+            if (::navController.isInitialized) {
+                navController.popBackStack()
+            } else {
+                super.onBackPressed()
+            }
+        }
     }
 }
 
@@ -61,16 +74,34 @@ fun HomeScreen(navController: NavHostController) {
 
     var stories by remember { mutableStateOf<List<Story>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var lastVisibleStory by remember { mutableStateOf<DocumentSnapshot?>(null) }
+    var isFetchingMore by remember { mutableStateOf(false) }
+    var loadedStoryIds by remember { mutableStateOf<MutableSet<String>>(mutableSetOf()) }
 
-    LaunchedEffect(Unit) {
-        firestore.collection("stories")
+    fun fetchStories() {
+        val query = firestore.collection("stories")
             .whereEqualTo("status", "published")
             .orderBy("publishedAt", Query.Direction.DESCENDING)
-            .get()
+            .limit(10)
+
+        if (lastVisibleStory != null) {
+            query.startAfter(lastVisibleStory)
+        }
+
+        query.get()
             .addOnSuccessListener { documents ->
+                if (documents.isEmpty) {
+                    isFetchingMore = false
+                    return@addOnSuccessListener
+                }
+                lastVisibleStory = documents.documents.lastOrNull()
                 val storyList = documents.mapNotNull { document ->
                     try {
                         val userId = document.getString("userId") ?: return@mapNotNull null
+                        if (loadedStoryIds.contains(document.id)) {
+                            return@mapNotNull null
+                        }
+                        loadedStoryIds.add(document.id)
                         Story(
                             id = document.id,
                             title = document.getString("title") ?: "",
@@ -83,14 +114,20 @@ fun HomeScreen(navController: NavHostController) {
                         null
                     }
                 }
-                stories = storyList
+                stories = stories + storyList
                 isLoading = false
+                isFetchingMore = false
                 Log.d("Firestore", "Published stories loaded: $storyList")
             }
             .addOnFailureListener { exception ->
                 Log.w("Firestore", "Error getting published stories: ", exception)
                 isLoading = false
+                isFetchingMore = false
             }
+    }
+
+    LaunchedEffect(Unit) {
+        fetchStories()
     }
 
     Scaffold(
@@ -101,7 +138,7 @@ fun HomeScreen(navController: NavHostController) {
             )
         },
         bottomBar = {
-            BottomNavigationBar(currentRoute = "home", context = LocalContext.current)
+            BottomNavigationBar(currentRoute = "home")
         }
     ) { paddingValues ->
         if (isLoading) {
@@ -111,7 +148,15 @@ fun HomeScreen(navController: NavHostController) {
         } else {
             LazyColumn(
                 contentPadding = paddingValues,
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier.padding(16.dp),
+                state = rememberLazyListState().apply {
+                    this.onBottomReached {
+                        if (!isFetchingMore) {
+                            isFetchingMore = true
+                            fetchStories()
+                        }
+                    }
+                }
             ) {
                 items(stories) { story ->
                     StoryItem(story = story, onClick = {
@@ -119,8 +164,36 @@ fun HomeScreen(navController: NavHostController) {
                     })
                     Spacer(modifier = Modifier.height(16.dp))
                 }
+                if (isFetchingMore) {
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
+                    }
+                }
             }
         }
+    }
+}
+
+@Composable
+fun LazyListState.onBottomReached(
+    loadMore: () -> Unit
+) {
+    val shouldLoadMore = remember {
+        derivedStateOf {
+            val visibleItemsInfo = layoutInfo.visibleItemsInfo
+            val lastVisibleItemIndex = visibleItemsInfo.lastOrNull()?.index ?: 0
+            lastVisibleItemIndex >= layoutInfo.totalItemsCount - 5 // Adjust this threshold as needed
+        }
+    }
+
+    LaunchedEffect(shouldLoadMore) {
+        snapshotFlow { shouldLoadMore.value }
+            .filter { it }
+            .collect {
+                loadMore()
+            }
     }
 }
 
@@ -132,7 +205,7 @@ fun StoryItem(story: Story, onClick: () -> Unit) {
     LaunchedEffect(story.authorId) {
         firestore.collection("users").document(story.authorId).get()
             .addOnSuccessListener { userDoc ->
-                authorName = userDoc.getString("username") ?: "Unknown"
+                authorName = userDoc.getString("name") ?: "Unknown"
             }
             .addOnFailureListener { e ->
                 Log.w("Firestore", "Error retrieving user details", e)
@@ -185,7 +258,7 @@ fun StoryDetailScreen(navController: NavHostController, storyId: String?) {
                         val userId = document.getString("userId") ?: return@addOnSuccessListener
                         firestore.collection("users").document(userId).get()
                             .addOnSuccessListener { userDoc ->
-                                val authorName = userDoc.getString("username") ?: "Unknown"
+                                val authorName = userDoc.getString("name") ?: "Unknown"
                                 storyDetail = StoryDetail(
                                     id = document.id,
                                     title = document.getString("title") ?: "",
