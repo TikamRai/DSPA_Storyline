@@ -7,30 +7,25 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.*
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.navigation.NavHostController
-import androidx.navigation.compose.rememberNavController
+import androidx.compose.ui.*
+import androidx.compose.ui.draw.*
+import androidx.compose.ui.graphics.*
+import androidx.compose.ui.platform.*
+import androidx.compose.ui.res.*
+import androidx.compose.ui.text.font.*
+import androidx.compose.ui.unit.*
+import androidx.navigation.*
+import androidx.navigation.compose.*
 import coil.compose.rememberImagePainter
-import com.google.firebase.firestore.FirebaseFirestore
-import kotlinx.coroutines.launch
+import com.google.firebase.firestore.*
+import kotlinx.coroutines.*
 
 class SearchedUserProfile : ComponentActivity() {
     private lateinit var firestore: FirebaseFirestore
@@ -43,9 +38,11 @@ class SearchedUserProfile : ComponentActivity() {
             val navController = rememberNavController()
 
             val userId = intent.getStringExtra("userId")
+            val sharedPreferences = getSharedPreferences("loginPrefs", Context.MODE_PRIVATE)
+            val loggedInUserId = sharedPreferences.getString("loggedInUserId", null)
 
             userId?.let {
-                SearchedUserProfileContent(context = this, userId = it, navController = navController, firestore = firestore)
+                SearchedUserProfileContent(context = this, searchedUserId = it, loggedInUserId = loggedInUserId, navController = navController, firestore = firestore)
             }
         }
     }
@@ -54,30 +51,51 @@ class SearchedUserProfile : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
-fun SearchedUserProfileContent(context: Context, userId: String, navController: NavHostController, firestore: FirebaseFirestore) {
+fun SearchedUserProfileContent(
+    context: Context,
+    searchedUserId: String,
+    loggedInUserId: String?,
+    navController: NavHostController,
+    firestore: FirebaseFirestore
+) {
     var userName by remember { mutableStateOf("Loading...") }
     var profilePictureUrl by remember { mutableStateOf<String?>(null) }
     var followersCount by remember { mutableStateOf(0) }
     var followingCount by remember { mutableStateOf(0) }
+    var isFollowing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(userId) {
-        firestore.collection("users").document(userId).get()
+    LaunchedEffect(searchedUserId) {
+        firestore.collection("users").document(searchedUserId).get()
             .addOnSuccessListener { document ->
-                if (document != null) {
+                if (document != null && document.exists()) {
                     userName = document.getString("name") ?: "No name"
                     profilePictureUrl = document.getString("profilePictureUrl")
-                    followersCount = (document.get("followers") as? List<*>)?.size ?: 0
-                    followingCount = (document.get("following") as? List<*>)?.size ?: 0
+
+                    val followersList = document.get("followersList") as? Map<String, Boolean>
+                    followersCount = followersList?.size ?: 0
+
+                    val followingList = document.get("followingList") as? Map<String, Boolean>
+                    followingCount = followingList?.size ?: 0
+
+                    isFollowing = loggedInUserId != null && followingList?.containsKey(loggedInUserId) == true
+                } else {
+
+                    userName = "No name"
+                    profilePictureUrl = null
+                    followersCount = 0
+                    followingCount = 0
+                    isFollowing = false
                 }
             }
             .addOnFailureListener { exception ->
-                scope.launch {}
-                Toast.makeText(
-                    context,
-                    "Failed to fetch user data: ${exception.message}",
-                    Toast.LENGTH_SHORT
-                ).show()
+                scope.launch {
+                    Toast.makeText(
+                        context,
+                        "Failed to fetch user data: ${exception.message}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
             }
     }
 
@@ -120,9 +138,86 @@ fun SearchedUserProfileContent(context: Context, userId: String, navController: 
 
             Text(text = userName, fontSize = 24.sp, color = Color.Black)
             Spacer(modifier = Modifier.height(8.dp))
-            Spacer(modifier = Modifier.height(16.dp))
 
-            // Display followers and following UI
+            Button(
+                onClick = {
+                    isFollowing = !isFollowing
+                    val currentUserRef = firestore.collection("users").document(searchedUserId)
+                    val loggedInUserRef = firestore.collection("users").document(loggedInUserId ?: "")
+
+                    if (isFollowing) {
+                        loggedInUserRef.update("followingList.$searchedUserId", true)
+                            .addOnSuccessListener {
+                                followersCount++
+                                Toast.makeText(
+                                    context,
+                                    "Now following",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                            .addOnFailureListener { exception ->
+                                Toast.makeText(
+                                    context,
+                                    "Failed to update following list",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        currentUserRef.update("followersList.$loggedInUserId", true)
+                            .addOnSuccessListener {
+                                Toast.makeText(
+                                    context,
+                                    "Follower added",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                            .addOnFailureListener { exception ->
+                                Toast.makeText(
+                                    context,
+                                    "Failed to update followers list",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                    } else {
+                        loggedInUserRef.update("followingList.$searchedUserId", null)
+                            .addOnSuccessListener {
+                                followersCount--
+                                Toast.makeText(
+                                    context,
+                                    "Unfollowed",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                            .addOnFailureListener { exception ->
+                                Toast.makeText(
+                                    context,
+                                    "Failed to update following list",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        currentUserRef.update("followersList.$loggedInUserId", null)
+                            .addOnSuccessListener {
+                                Toast.makeText(
+                                    context,
+                                    "Follower removed",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                            .addOnFailureListener { exception ->
+                                Toast.makeText(
+                                    context,
+                                    "Failed to update followers list",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                    }
+
+                },
+                modifier = Modifier.padding(8.dp)
+            ) {
+                Text(text = if (isFollowing) "Unfollow" else "Follow")
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -142,13 +237,6 @@ fun SearchedUserProfileContent(context: Context, userId: String, navController: 
                             modifier = Modifier
                                 .padding(2.dp)
                                 .align(Alignment.CenterHorizontally),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonColors(
-                                containerColor = Color.Transparent,
-                                contentColor = Color(0xFF2DAAFF),
-                                disabledContainerColor = Color.Gray,
-                                disabledContentColor = Color.Transparent
-                            )
                         ) {
                             Text(
                                 text = "$followersCount Follower",
@@ -163,13 +251,6 @@ fun SearchedUserProfileContent(context: Context, userId: String, navController: 
                             modifier = Modifier
                                 .padding(2.dp)
                                 .align(Alignment.CenterHorizontally),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonColors(
-                                containerColor = Color.Transparent,
-                                contentColor = Color(0xFF2DAAFF),
-                                disabledContainerColor = Color.Gray,
-                                disabledContentColor = Color.Transparent
-                            )
                         ) {
                             Text(
                                 text = "$followingCount Following",

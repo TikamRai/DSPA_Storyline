@@ -84,6 +84,7 @@ fun SearchUserApp(navController: NavHostController, firestore: FirebaseFirestore
     var query by remember { mutableStateOf(TextFieldValue()) }
     var searchResults by remember { mutableStateOf<List<User>>(emptyList()) }
     val context = LocalContext.current
+    val loggedInUserId = "your_logged_in_user_id_here" // Retrieve logged-in user ID from your authentication system
 
     Column(
         modifier = Modifier
@@ -128,23 +129,22 @@ fun SearchUserApp(navController: NavHostController, firestore: FirebaseFirestore
 
         LazyColumn {
             items(searchResults) { user ->
-                SearchResultItem(context, user) {
+                SearchResultItem(context, user, loggedInUserId) {
                 }
             }
         }
-
-
     }
 }
 
 @Composable
-fun SearchResultItem(context: Context, user: User, onUserClicked: () -> Unit) {
+fun SearchResultItem(context: Context, user: User, loggedInUserId: String, onUserClicked: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp)
             .clickable {
                 val intent = Intent(context, SearchedUserProfile::class.java)
+                intent.putExtra("loggedInUserId", loggedInUserId)
                 intent.putExtra("userId", user.uid)
                 try {
                     context.startActivity(intent)
@@ -168,8 +168,6 @@ fun SearchResultItem(context: Context, user: User, onUserClicked: () -> Unit) {
         Text(text = user.name)
     }
 }
-
-
 
 data class User(
     val uid: String,

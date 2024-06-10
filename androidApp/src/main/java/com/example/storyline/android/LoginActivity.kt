@@ -74,11 +74,13 @@ class LoginActivity : ComponentActivity() {
         auth.signInWithEmailAndPassword(email, password)
             .addOnCompleteListener(this) { task ->
                 if (task.isSuccessful) {
+                    val loggedInUserId = auth.currentUser?.uid // Get logged-in user's ID
                     if (rememberMe) {
                         val sharedPreferences =
                             getSharedPreferences("loginPrefs", Context.MODE_PRIVATE)
                         with(sharedPreferences.edit()) {
                             putString("savedEmail", email)
+                            putString("loggedInUserId", loggedInUserId) // Store the logged-in user's ID
                             apply()
                         }
                     }
