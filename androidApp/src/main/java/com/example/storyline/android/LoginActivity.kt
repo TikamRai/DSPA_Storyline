@@ -80,7 +80,7 @@ class LoginActivity : ComponentActivity() {
                             getSharedPreferences("loginPrefs", Context.MODE_PRIVATE)
                         with(sharedPreferences.edit()) {
                             putString("savedEmail", email)
-                            putString("loggedInUserId", loggedInUserId) // Store the logged-in user's ID
+                            putString("loggedInUserId", loggedInUserId)
                             apply()
                         }
                     }

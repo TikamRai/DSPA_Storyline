@@ -82,6 +82,7 @@ class ProfileActivity : ComponentActivity() {
         firestore = FirebaseFirestore.getInstance()
 
         val userEmail = user.email ?: "No email"
+        val loggedInUserId = user.uid
 
         firestore.collection("users").document(user.uid).get()
             .addOnSuccessListener { document ->
@@ -96,6 +97,7 @@ class ProfileActivity : ComponentActivity() {
                             NavHost(navController = navController, startDestination = "profile") {
                                 composable("profile") {
                                     ProfileScreen(
+                                        loggedInUserId = loggedInUserId,
                                         name = userName,
                                         email = userEmail,
                                         profilePictureUrl = profilePictureUrl,
@@ -109,10 +111,10 @@ class ProfileActivity : ComponentActivity() {
                                     )
                                 }
                                 composable("followers") {
-                                    FollowersScreen(navController, followers)
+                                    FollowersScreen(navController, followers, loggedInUserId)
                                 }
                                 composable("following") {
-                                    FollowingScreen(navController, following)
+                                    FollowingScreen(navController, following, loggedInUserId)
                                 }
                                 composable("userProfile/{userId}") { backStackEntry ->
                                     val userId = backStackEntry.arguments?.getString("userId")
@@ -188,6 +190,7 @@ class ProfileActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
+    loggedInUserId: String,
     name: String,
     email: String,
     profilePictureUrl: String?,
@@ -199,12 +202,6 @@ fun ProfileScreen(
     onLogoutClick: () -> Unit,
     navController: NavHostController
 ) {
-    var name by remember { mutableStateOf(name) }
-    var email by remember { mutableStateOf(email) }
-    var profilePictureUrl by remember { mutableStateOf(profilePictureUrl) }
-    var followers by remember { mutableStateOf(followersCount) }
-    var following by remember { mutableStateOf(followingCount) }
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -261,6 +258,7 @@ fun ProfileScreen(
             Text(text = email, fontSize = 16.sp, color = Color.Gray)
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Edit profile button
             ElevatedButton(
                 onClick = { /* Handle edit profile */ },
                 modifier = Modifier
@@ -274,8 +272,8 @@ fun ProfileScreen(
             ) {
                 Text(text = "Edit Profile")
             }
-            Spacer(modifier = Modifier.height(24.dp))
 
+            // Followers and Following buttons
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -304,7 +302,7 @@ fun ProfileScreen(
                             )
                         ) {
                             Text(
-                                text = "$followers Follower",
+                                text = "$followersCount Follower",
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -325,7 +323,7 @@ fun ProfileScreen(
                             )
                         ) {
                             Text(
-                                text = "$following Following",
+                                text = "$followingCount Following",
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -333,8 +331,8 @@ fun ProfileScreen(
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(16.dp))
 
+            // Published Stories button
             OutlinedButton(
                 onClick = { /* Handle published stories */ },
                 modifier = Modifier
@@ -355,8 +353,8 @@ fun ProfileScreen(
                     fontWeight = FontWeight.Bold
                 )
             }
-            Spacer(modifier = Modifier.height(16.dp))
 
+            // Reading List button
             OutlinedButton(
                 onClick = { /* Handle reading list */ },
                 modifier = Modifier
@@ -377,8 +375,8 @@ fun ProfileScreen(
                     fontWeight = FontWeight.Bold
                 )
             }
-            Spacer(modifier = Modifier.height(16.dp))
 
+            // Logout button
             TextButton(
                 onClick = onLogoutClick,
                 modifier = Modifier
@@ -399,6 +397,7 @@ fun ProfileScreen(
                     textDecoration = TextDecoration.Underline
                 )
             }
+
             Spacer(modifier = Modifier.weight(1f))
         }
     }
@@ -461,7 +460,7 @@ fun BottomNavigationBar(currentRoute: String, navController: NavHostController, 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FollowersScreen(navController: NavHostController, followers: List<String>) {
+fun FollowersScreen(navController: NavHostController, followers: List<String>, loggedInUserId: String) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -498,7 +497,7 @@ fun FollowersScreen(navController: NavHostController, followers: List<String>) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FollowingScreen(navController: NavHostController, following: List<String>) {
+fun FollowingScreen(navController: NavHostController, following: List<String>, loggedInUserId: String) {
     Scaffold(
         topBar = {
             TopAppBar(
