@@ -74,6 +74,7 @@ class CreateStoryActivity : ComponentActivity() {
     private lateinit var auth: FirebaseAuth
     private lateinit var firestore: FirebaseFirestore
     private lateinit var storage: FirebaseStorage
+    private lateinit var navController: NavHostController
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -115,6 +116,20 @@ class CreateStoryActivity : ComponentActivity() {
                         StoryPartEditorScreen(navController, draftPartId, firestore)
                     }
                 }
+            }
+        }
+    }
+
+    override fun onBackPressed() {
+        if (::navController.isInitialized && navController.currentDestination?.route == "create_screen") {
+            val intent = Intent(this, HomeActivity::class.java)
+            startActivity(intent)
+            finish()
+        } else {
+            if (::navController.isInitialized) {
+                navController.popBackStack()
+            } else {
+                super.onBackPressed()
             }
         }
     }

@@ -75,7 +75,7 @@ fun SearchedUserProfileContent(
     var isFollowing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(userId) {
+    fun fetchUserData() {
         firestore.collection("users").document(userId).get()
             .addOnSuccessListener { document ->
                 if (document != null) {
@@ -98,6 +98,10 @@ fun SearchedUserProfileContent(
                     Toast.LENGTH_SHORT
                 ).show()
             }
+    }
+
+    LaunchedEffect(userId) {
+        fetchUserData()
     }
 
     Scaffold(
@@ -130,7 +134,6 @@ fun SearchedUserProfileContent(
                     modifier = Modifier
                         .size(200.dp)
                         .clip(CircleShape)
-                        .clickable { /* Handle click if needed */ }
                 )
             }
 
@@ -142,7 +145,9 @@ fun SearchedUserProfileContent(
             Button(
                 onClick = {
                     isFollowing = !isFollowing
-                    updateFollowStatus(userId, loggedInUserId, isFollowing)
+                    updateFollowStatus(userId, loggedInUserId, isFollowing) {
+                        fetchUserData()
+                    }
                 },
                 modifier = Modifier.padding(8.dp)
             ) {
@@ -166,10 +171,16 @@ fun SearchedUserProfileContent(
                 ) {
                     Column() {
                         TextButton(
-                            onClick = { navController.navigate("followers") },
+                            onClick = { },
                             modifier = Modifier
                                 .padding(2.dp)
                                 .align(Alignment.CenterHorizontally),
+                            colors = ButtonColors(
+                                containerColor = Color.Transparent,
+                                contentColor = Color(0xFF2DAAFF),
+                                disabledContainerColor = Color.Gray,
+                                disabledContentColor = Color.Transparent
+                            )
                         ) {
                             Text(
                                 text = "$followersCount Follower",
@@ -180,10 +191,16 @@ fun SearchedUserProfileContent(
                     }
                     Column() {
                         TextButton(
-                            onClick = { navController.navigate("following") },
+                            onClick = { },
                             modifier = Modifier
                                 .padding(2.dp)
                                 .align(Alignment.CenterHorizontally),
+                            colors = ButtonColors(
+                                containerColor = Color.Transparent,
+                                contentColor = Color(0xFF2DAAFF),
+                                disabledContainerColor = Color.Gray,
+                                disabledContentColor = Color.Transparent
+                            )
                         ) {
                             Text(
                                 text = "$followingCount Following",
@@ -198,7 +215,7 @@ fun SearchedUserProfileContent(
     }
 }
 
-private fun updateFollowStatus(userId: String, loggedInUserId: String, isFollowing: Boolean) {
+private fun updateFollowStatus(userId: String, loggedInUserId: String, isFollowing: Boolean, onComplete: () -> Unit) {
     val firestore = FirebaseFirestore.getInstance()
     val userRef = firestore.collection("users").document(userId)
     val loggedInUserRef = firestore.collection("users").document(loggedInUserId)
@@ -212,6 +229,7 @@ private fun updateFollowStatus(userId: String, loggedInUserId: String, isFollowi
             batch.update(userRef, "followers", FieldValue.arrayRemove(loggedInUserId))
         }
     }.addOnSuccessListener {
+        onComplete()
     }.addOnFailureListener { exception ->
         Log.e("Firestore", "Error updating follow status: $exception")
     }
