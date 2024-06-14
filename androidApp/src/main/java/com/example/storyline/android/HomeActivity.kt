@@ -8,14 +8,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -24,26 +17,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -55,42 +30,45 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import coil.compose.rememberAsyncImagePainter
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.flow.filter
 
 class HomeActivity : ComponentActivity() {
     private lateinit var navController: NavHostController
+    private lateinit var auth: FirebaseAuth
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        auth = FirebaseAuth.getInstance()
+        val loggedInUserId = auth.currentUser?.uid ?: ""
+
         setContent {
             navController = rememberNavController()
             Theme {
                 NavHost(navController, startDestination = "home") {
-                    composable("home") { HomeScreen(navController) }
-                    composable("story_detail/{storyId}") { backStackEntry ->
-                        StoryDetailScreen(
-                            navController,
-                            backStackEntry.arguments?.getString("storyId")
-                        )
+                    composable("home") { HomeScreen(navController, loggedInUserId) }
+                    composable("story_detail/{storyId}/{loggedInUserId}",
+                        arguments = listOf(navArgument("storyId") { type = NavType.StringType },
+                            navArgument("loggedInUserId") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val storyId = backStackEntry.arguments?.getString("storyId")
+                        val userId = backStackEntry.arguments?.getString("loggedInUserId")
+                        StoryDetailScreen(navController, storyId, userId ?: "")
                     }
                     composable("story_parts/{storyId}") { backStackEntry ->
-                        StoryPartsScreen(
-                            navController,
-                            backStackEntry.arguments?.getString("storyId")
-                        )
+                        StoryPartsScreen(navController, backStackEntry.arguments?.getString("storyId"))
                     }
                     composable("read_story_part/{partId}") { backStackEntry ->
-                        ReadStoryPartScreen(
-                            navController,
-                            backStackEntry.arguments?.getString("partId")
-                        )
+                        ReadStoryPartScreen(navController, backStackEntry.arguments?.getString("partId"))
                     }
                 }
             }
@@ -113,7 +91,7 @@ class HomeActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(navController: NavHostController) {
+fun HomeScreen(navController: NavHostController, loggedInUserId: String) {
     val firestore = remember { FirebaseFirestore.getInstance() }
 
     var stories by remember { mutableStateOf<List<Story>>(emptyList()) }
@@ -123,12 +101,9 @@ fun HomeScreen(navController: NavHostController) {
     val loadedStoryIds by remember { mutableStateOf<MutableSet<String>>(mutableSetOf()) }
     var followedUserIds by remember { mutableStateOf<List<String>>(emptyList()) }
 
-    val context = LocalContext.current
-    val currentUser = FirebaseAuth.getInstance().currentUser
-    val userId = currentUser?.uid ?: ""
-
     fun fetchStories() {
         if (followedUserIds.isEmpty()) {
+            isLoading = false
             return
         }
 
@@ -199,7 +174,7 @@ fun HomeScreen(navController: NavHostController) {
     }
 
     LaunchedEffect(Unit) {
-        fetchFollowedUserIds(userId)
+        fetchFollowedUserIds(loggedInUserId)
     }
 
     Scaffold(
@@ -253,7 +228,7 @@ fun HomeScreen(navController: NavHostController) {
                 ) {
                     items(stories) { story ->
                         StoryItem(story = story, onClick = {
-                            navController.navigate("story_detail/${story.id}")
+                            navController.navigate("story_detail/${story.id}/$loggedInUserId")
                         })
                         Spacer(modifier = Modifier.height(16.dp))
                     }
@@ -342,7 +317,7 @@ fun StoryItem(story: Story, onClick: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StoryDetailScreen(navController: NavHostController, storyId: String?) {
+fun StoryDetailScreen(navController: NavHostController, storyId: String?, loggedInUserId: String) {
     val firestore = remember { FirebaseFirestore.getInstance() }
     var storyDetail by remember { mutableStateOf<StoryDetail?>(null) }
     var isLoading by remember { mutableStateOf(true) }
@@ -455,6 +430,7 @@ fun StoryDetailScreen(navController: NavHostController, storyId: String?) {
                     Button(
                         onClick = {
                             navController.navigate("story_parts/${story.id}")
+                            addToReadingList(loggedInUserId, story.id)
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -467,6 +443,30 @@ fun StoryDetailScreen(navController: NavHostController, storyId: String?) {
             }
         }
     }
+}
+
+private fun addToReadingList(userId: String, storyId: String) {
+    val firestore = FirebaseFirestore.getInstance()
+    val userRef = firestore.collection("users").document(userId)
+
+    userRef.get()
+        .addOnSuccessListener { document ->
+            val readingList = document.get("readingList") as? List<String> ?: emptyList()
+            if (!readingList.contains(storyId)) {
+                userRef.update("readingList", FieldValue.arrayUnion(storyId))
+                    .addOnSuccessListener {
+                        Log.d("Firestore", "Story added to reading list")
+                    }
+                    .addOnFailureListener { exception ->
+                        Log.e("Firestore", "Error adding story to reading list: $exception")
+                    }
+            } else {
+                Log.d("Firestore", "Story already in reading list")
+            }
+        }
+        .addOnFailureListener { exception ->
+            Log.e("Firestore", "Error getting user document: $exception")
+        }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

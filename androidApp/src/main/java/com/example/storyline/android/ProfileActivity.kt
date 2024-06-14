@@ -12,47 +12,22 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -69,11 +44,11 @@ import coil.compose.rememberAsyncImagePainter
 import coil.compose.rememberImagePainter
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.launch
-
 
 class ProfileActivity : ComponentActivity() {
     private lateinit var auth: FirebaseAuth
@@ -108,7 +83,7 @@ class ProfileActivity : ComponentActivity() {
                 val followers = snapshot.get("followers") as? List<String> ?: emptyList()
                 val following = snapshot.get("following") as? List<String> ?: emptyList()
                 setContent {
-                    val navController = rememberNavController()
+                    navController = rememberNavController()
                     Theme {
                         NavHost(navController = navController, startDestination = "profile") {
                             composable("profile") {
@@ -122,6 +97,7 @@ class ProfileActivity : ComponentActivity() {
                                     onProfilePictureClick = { pickImage() },
                                     onFollowersClick = { navController.navigate("followers") },
                                     onFollowingClick = { navController.navigate("following") },
+                                    onReadingListClick = { navController.navigate("reading_list/$loggedInUserId") },
                                     onLogoutClick = { logout() },
                                     navController = navController
                                 )
@@ -144,6 +120,52 @@ class ProfileActivity : ComponentActivity() {
                                     backStackEntry.arguments?.getString("loggedInUserId")
                                         ?: return@composable
                                 UserProfileScreen(navController, userId, loggedInUserId)
+                            }
+                            composable(
+                                "reading_list/{loggedInUserId}",
+                                arguments = listOf(navArgument("loggedInUserId") {
+                                    type = NavType.StringType
+                                })
+                            ) { backStackEntry ->
+                                val loggedInUserId =
+                                    backStackEntry.arguments?.getString("loggedInUserId")
+                                        ?: return@composable
+                                ReadingListScreen(navController = navController, userId = loggedInUserId)
+                            }
+                            composable(
+                                "reading_list_story_detail/{storyId}/{userId}",
+                                arguments = listOf(navArgument("storyId") { type = NavType.StringType },
+                                    navArgument("userId") { type = NavType.StringType })
+                            ) { backStackEntry ->
+                                val storyId = backStackEntry.arguments?.getString("storyId")
+                                val userId = backStackEntry.arguments?.getString("userId")
+                                ReadingListStoryDetailScreen(navController, storyId, userId ?: "")
+                            }
+                            composable(
+                                "published_stories/{userId}",
+                                arguments = listOf(navArgument("userId") {
+                                    type = NavType.StringType
+                                })
+                            ) { backStackEntry ->
+                                val userId =
+                                    backStackEntry.arguments?.getString("userId")
+                                        ?: return@composable
+                                PublishedStoriesScreen(navController = navController, userId = userId)
+                            }
+                            composable(
+                                "published_story_detail/{storyId}/{userId}",
+                                arguments = listOf(navArgument("storyId") { type = NavType.StringType },
+                                    navArgument("userId") { type = NavType.StringType })
+                            ) { backStackEntry ->
+                                val storyId = backStackEntry.arguments?.getString("storyId")
+                                val userId = backStackEntry.arguments?.getString("userId")
+                                PublishedStoryDetailScreen(navController, storyId, userId ?: "")
+                            }
+                            composable("story_parts/{storyId}") { backStackEntry ->
+                                StoryPartsScreen(navController, backStackEntry.arguments?.getString("storyId"))
+                            }
+                            composable("read_story_part/{partId}") { backStackEntry ->
+                                ReadStoryPartScreen(navController, backStackEntry.arguments?.getString("partId"))
                             }
                         }
                     }
@@ -192,7 +214,6 @@ class ProfileActivity : ComponentActivity() {
             }
     }
 
-
     private fun updateProfilePictureInFireStore(uri: Uri) {
         val user = auth.currentUser ?: return
         val userRef = firestore.collection("users").document(user.uid)
@@ -229,6 +250,7 @@ fun ProfileScreen(
     onProfilePictureClick: () -> Unit,
     onFollowersClick: () -> Unit,
     onFollowingClick: () -> Unit,
+    onReadingListClick: () -> Unit,
     onLogoutClick: () -> Unit,
     navController: NavHostController
 ) {
@@ -376,7 +398,7 @@ fun ProfileScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedButton(
-                onClick = { /* Handle published stories */ },
+                onClick = { navController.navigate("published_stories/$loggedInUserId") },
                 modifier = Modifier
                     .fillMaxWidth()
                     .fillMaxHeight(0.20f)
@@ -398,7 +420,7 @@ fun ProfileScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedButton(
-                onClick = { /* Handle reading list */ },
+                onClick = onReadingListClick,
                 modifier = Modifier
                     .fillMaxWidth()
                     .fillMaxHeight(0.25f)
@@ -821,3 +843,409 @@ private fun updateFollowStatus(
         Log.e("Firestore", "Error updating follow status: $exception")
     }
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PublishedStoriesScreen(navController: NavHostController, userId: String) {
+    val firestore = remember { FirebaseFirestore.getInstance() }
+    var publishedStories by remember { mutableStateOf<List<Story>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(userId) {
+        firestore.collection("stories")
+            .whereEqualTo("userId", userId)
+            .whereEqualTo("status", "published")
+            .get()
+            .addOnSuccessListener { storyDocuments ->
+                val stories = storyDocuments.mapNotNull { doc ->
+                    try {
+                        Story(
+                            id = doc.id,
+                            title = doc.getString("title") ?: "",
+                            imageUrl = doc.getString("coverImageUrl") ?: "",
+                            authorId = doc.getString("userId") ?: "",
+                            createdAt = doc.getTimestamp("createdAt") ?: com.google.firebase.Timestamp.now()
+                        )
+                    } catch (e: Exception) {
+                        Log.e("Firestore", "Error parsing story document", e)
+                        null
+                    }
+                }
+                publishedStories = stories
+                isLoading = false
+            }
+            .addOnFailureListener { exception ->
+                Log.w("Firestore", "Error getting stories: ", exception)
+                isLoading = false
+            }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Published Stories") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF8BBF8C))
+            )
+        }
+    ) { paddingValues ->
+        if (isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        } else if (publishedStories.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(text = "No published stories", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            }
+        } else {
+            LazyColumn(contentPadding = paddingValues) {
+                items(publishedStories) { story ->
+                    StoryItem(story = story, onClick = {
+                        navController.navigate("published_story_detail/${story.id}/$userId")
+                    })
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PublishedStoryDetailScreen(navController: NavHostController, storyId: String?, userId: String) {
+    val firestore = remember { FirebaseFirestore.getInstance() }
+    var storyDetail by remember { mutableStateOf<StoryDetail?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(storyId) {
+        if (storyId != null) {
+            firestore.collection("stories").document(storyId).get()
+                .addOnSuccessListener { document ->
+                    if (document.exists()) {
+                        val userId = document.getString("userId") ?: return@addOnSuccessListener
+                        firestore.collection("users").document(userId).get()
+                            .addOnSuccessListener { userDoc ->
+                                val authorName = userDoc.getString("name") ?: "Unknown"
+                                storyDetail = StoryDetail(
+                                    id = document.id,
+                                    title = document.getString("title") ?: "",
+                                    imageUrl = document.getString("coverImageUrl") ?: "",
+                                    author = authorName,
+                                    createdAt = document.getTimestamp("createdAt") ?: com.google.firebase.Timestamp.now(),
+                                    category = document.getString("category") ?: "",
+                                    description = document.getString("description") ?: ""
+                                )
+                                isLoading = false
+                            }
+                    } else {
+                        isLoading = false
+                    }
+                }
+                .addOnFailureListener { e ->
+                    Log.w("Firestore", "Error retrieving story details", e)
+                    isLoading = false
+                }
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Story Detail") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF8BBF8C))
+            )
+        }
+    ) { paddingValues ->
+        if (isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        } else {
+            storyDetail?.let { story ->
+                Column(
+                    modifier = Modifier
+                        .padding(paddingValues)
+                        .padding(16.dp)
+                        .fillMaxSize()
+                ) {
+                    Image(
+                        painter = rememberAsyncImagePainter(model = story.imageUrl),
+                        contentDescription = story.title,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
+                        contentScale = ContentScale.Crop
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = story.title,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                    Text(
+                        text = story.author,
+                        fontSize = 16.sp,
+                        color = Color.Gray,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                    Text(
+                        text = story.category,
+                        fontSize = 16.sp,
+                        color = Color.Gray,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                    Text(
+                        text = "Description",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(start = 4.dp, top = 8.dp)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .padding(4.dp)
+                            .background(Color.White)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        Text(
+                            text = story.description,
+                            fontSize = 16.sp,
+                            modifier = Modifier.padding(4.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = {
+                            navController.navigate("story_parts/${story.id}")
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8BBF8C))
+                    ) {
+                        Text(text = "See The Content", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ReadingListScreen(navController: NavHostController, userId: String) {
+    val firestore = remember { FirebaseFirestore.getInstance() }
+    var readingList by remember { mutableStateOf<List<Story>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(userId) {
+        firestore.collection("users").document(userId).get()
+            .addOnSuccessListener { document ->
+                val storyIds = document.get("readingList") as? List<String> ?: emptyList()
+                if (storyIds.isNotEmpty()) {
+                    firestore.collection("stories").whereIn(FieldPath.documentId(), storyIds).get()
+                        .addOnSuccessListener { storyDocuments ->
+                            val stories = storyDocuments.mapNotNull { doc ->
+                                try {
+                                    Story(
+                                        id = doc.id,
+                                        title = doc.getString("title") ?: "",
+                                        imageUrl = doc.getString("coverImageUrl") ?: "",
+                                        authorId = doc.getString("userId") ?: "",
+                                        createdAt = doc.getTimestamp("createdAt") ?: com.google.firebase.Timestamp.now()
+                                    )
+                                } catch (e: Exception) {
+                                    Log.e("Firestore", "Error parsing story document", e)
+                                    null
+                                }
+                            }
+                            readingList = stories
+                            isLoading = false
+                        }
+                        .addOnFailureListener { exception ->
+                            Log.w("Firestore", "Error getting stories: ", exception)
+                            isLoading = false
+                        }
+                } else {
+                    isLoading = false
+                }
+            }
+            .addOnFailureListener { exception ->
+                Log.w("Firestore", "Error getting reading list: ", exception)
+                isLoading = false
+            }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Reading List") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF8BBF8C))
+            )
+        }
+    ) { paddingValues ->
+        if (isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        } else if (readingList.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(text = "No stories in your reading list", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            }
+        } else {
+            LazyColumn(contentPadding = paddingValues) {
+                items(readingList) { story ->
+                    StoryItem(story = story, onClick = {
+                        navController.navigate("reading_list_story_detail/${story.id}/$userId")
+                    })
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ReadingListStoryDetailScreen(navController: NavHostController, storyId: String?, userId: String) {
+    val firestore = remember { FirebaseFirestore.getInstance() }
+    var storyDetail by remember { mutableStateOf<StoryDetail?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(storyId) {
+        if (storyId != null) {
+            firestore.collection("stories").document(storyId).get()
+                .addOnSuccessListener { document ->
+                    if (document.exists()) {
+                        val userId = document.getString("userId") ?: return@addOnSuccessListener
+                        firestore.collection("users").document(userId).get()
+                            .addOnSuccessListener { userDoc ->
+                                val authorName = userDoc.getString("name") ?: "Unknown"
+                                storyDetail = StoryDetail(
+                                    id = document.id,
+                                    title = document.getString("title") ?: "",
+                                    imageUrl = document.getString("coverImageUrl") ?: "",
+                                    author = authorName,
+                                    createdAt = document.getTimestamp("createdAt") ?: com.google.firebase.Timestamp.now(),
+                                    category = document.getString("category") ?: "",
+                                    description = document.getString("description") ?: ""
+                                )
+                                isLoading = false
+                            }
+                    } else {
+                        isLoading = false
+                    }
+                }
+                .addOnFailureListener { e ->
+                    Log.w("Firestore", "Error retrieving story details", e)
+                    isLoading = false
+                }
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Story Detail") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF8BBF8C))
+            )
+        }
+    ) { paddingValues ->
+        if (isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        } else {
+            storyDetail?.let { story ->
+                Column(
+                    modifier = Modifier
+                        .padding(paddingValues)
+                        .padding(16.dp)
+                        .fillMaxSize()
+                ) {
+                    Image(
+                        painter = rememberAsyncImagePainter(model = story.imageUrl),
+                        contentDescription = story.title,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
+                        contentScale = ContentScale.Crop
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = story.title,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                    Text(
+                        text = story.author,
+                        fontSize = 16.sp,
+                        color = Color.Gray,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                    Text(
+                        text = story.category,
+                        fontSize = 16.sp,
+                        color = Color.Gray,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                    Text(
+                        text = "Description",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(start = 4.dp, top = 8.dp)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .padding(4.dp)
+                            .background(Color.White)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        Text(
+                            text = story.description,
+                            fontSize = 16.sp,
+                            modifier = Modifier.padding(4.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = {
+                            navController.navigate("story_parts/${story.id}")
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8BBF8C))
+                    ) {
+                        Text(text = "Continue Reading", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
