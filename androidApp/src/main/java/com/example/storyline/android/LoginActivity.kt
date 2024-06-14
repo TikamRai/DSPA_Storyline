@@ -137,7 +137,7 @@ fun LoginScreen(
             verticalArrangement = Arrangement.Center
         ) {
             Image(
-                painter = painterResource(id = com.example.storyline.android.R.drawable.applogo),
+                painter = painterResource(id = R.drawable.applogo),
                 contentDescription = "AppLogo",
                 modifier = Modifier
                     .size(150.dp)

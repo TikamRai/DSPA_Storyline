@@ -49,7 +49,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
-import coil.compose.rememberImagePainter
+import coil.compose.rememberAsyncImagePainter
 import com.google.firebase.firestore.FirebaseFirestore
 
 class SearchActivity : ComponentActivity() {
@@ -61,7 +61,7 @@ class SearchActivity : ComponentActivity() {
 
         setContent {
             val navController = rememberNavController()
-            navController.addOnDestinationChangedListener { controller, destination, arguments ->
+            navController.addOnDestinationChangedListener { _, destination, _ ->
                 Log.d("Navigation", "Destination changed to: ${destination.route}")
             }
 
@@ -71,6 +71,7 @@ class SearchActivity : ComponentActivity() {
         }
     }
 
+    @Deprecated("This method has been deprecated in favor of using the\n      {@link OnBackPressedDispatcher} via {@link #getOnBackPressedDispatcher()}.\n      The OnBackPressedDispatcher controls how back button events are dispatched\n      to one or more {@link OnBackPressedCallback} objects.")
     override fun onBackPressed() {
         super.onBackPressed()
         val intent = Intent(this, HomeActivity::class.java)
@@ -82,7 +83,7 @@ class SearchActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchApp(navController: NavHostController, firestore: FirebaseFirestore) {
-    val context = LocalContext.current
+    LocalContext.current
 
     Scaffold(
         topBar = {
@@ -96,13 +97,13 @@ fun SearchApp(navController: NavHostController, firestore: FirebaseFirestore) {
         }
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
-            SearchUserApp(navController, firestore)
+            SearchUserApp(firestore)
         }
     }
 }
 
 @Composable
-fun SearchUserApp(navController: NavHostController, firestore: FirebaseFirestore) {
+fun SearchUserApp(firestore: FirebaseFirestore) {
     var query by remember { mutableStateOf(TextFieldValue()) }
     var searchResults by remember { mutableStateOf<List<User>>(emptyList()) }
     val context = LocalContext.current
@@ -152,8 +153,7 @@ fun SearchUserApp(navController: NavHostController, firestore: FirebaseFirestore
 
         LazyColumn {
             items(searchResults) { user ->
-                SearchResultItem(context, user, loggedInUserId) {
-                }
+                SearchResultItem(context, user, loggedInUserId)
             }
         }
     }
@@ -163,8 +163,7 @@ fun SearchUserApp(navController: NavHostController, firestore: FirebaseFirestore
 fun SearchResultItem(
     context: Context,
     user: User,
-    loggedInUserId: String,
-    onUserClicked: () -> Unit
+    loggedInUserId: String
 ) {
     Row(
         modifier = Modifier
@@ -187,7 +186,7 @@ fun SearchResultItem(
     ) {
         if (user.profilePictureUrl != null) {
             Image(
-                painter = rememberImagePainter(user.profilePictureUrl),
+                painter = rememberAsyncImagePainter(user.profilePictureUrl),
                 contentDescription = "Profile Picture",
                 modifier = Modifier
                     .size(50.dp)
@@ -219,7 +218,7 @@ data class User(
 fun searchUser(
     query: String,
     firestore: FirebaseFirestore,
-    context: android.content.Context,
+    context: Context,
     onResults: (List<User>) -> Unit
 ) {
     if (query.isBlank()) {

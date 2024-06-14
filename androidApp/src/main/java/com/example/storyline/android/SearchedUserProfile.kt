@@ -35,6 +35,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -47,9 +48,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
-import coil.compose.rememberImagePainter
+import coil.compose.rememberAsyncImagePainter
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -65,7 +65,7 @@ class SearchedUserProfile : ComponentActivity() {
         auth = FirebaseAuth.getInstance()
 
         setContent {
-            val navController = rememberNavController()
+            rememberNavController()
 
             val loggedInUserId = auth.currentUser?.uid ?: ""
             val userId = intent.getStringExtra("userId")
@@ -74,7 +74,6 @@ class SearchedUserProfile : ComponentActivity() {
                 context = this,
                 loggedInUserId = loggedInUserId,
                 userId = userId ?: "",
-                navController = navController,
                 firestore = firestore
             )
         }
@@ -88,13 +87,12 @@ fun SearchedUserProfileContent(
     context: Context,
     loggedInUserId: String,
     userId: String,
-    navController: NavHostController,
     firestore: FirebaseFirestore
 ) {
     var userName by remember { mutableStateOf("Loading...") }
     var profilePictureUrl by remember { mutableStateOf<String?>(null) }
-    var followersCount by remember { mutableStateOf(0) }
-    var followingCount by remember { mutableStateOf(0) }
+    var followersCount by remember { mutableIntStateOf(0) }
+    var followingCount by remember { mutableIntStateOf(0) }
     var isFollowing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
@@ -108,7 +106,7 @@ fun SearchedUserProfileContent(
                     followingCount = (document.get("following") as? List<*>)?.size ?: 0
 
                     if (loggedInUserId.isNotEmpty()) {
-                        val followingList = document.get("followers") as? List<String>
+                        val followingList = document.get("followers") as? List<*>
                         isFollowing = followingList?.contains(loggedInUserId) ?: false
                     }
                 }
@@ -152,7 +150,7 @@ fun SearchedUserProfileContent(
 
             if (profilePictureUrl != null) {
                 Image(
-                    painter = rememberImagePainter(profilePictureUrl),
+                    painter = rememberAsyncImagePainter(profilePictureUrl),
                     contentDescription = "Profile Picture",
                     modifier = Modifier
                         .size(200.dp)
@@ -200,7 +198,7 @@ fun SearchedUserProfileContent(
                         .padding(horizontal = 50.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Column() {
+                    Column {
                         TextButton(
                             onClick = { },
                             modifier = Modifier
@@ -220,7 +218,7 @@ fun SearchedUserProfileContent(
                             )
                         }
                     }
-                    Column() {
+                    Column {
                         TextButton(
                             onClick = { },
                             modifier = Modifier

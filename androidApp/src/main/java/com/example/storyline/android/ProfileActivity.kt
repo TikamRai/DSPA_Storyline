@@ -12,7 +12,18 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -21,8 +32,28 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,7 +72,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import coil.compose.rememberAsyncImagePainter
-import coil.compose.rememberImagePainter
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.FieldPath
@@ -130,16 +160,21 @@ class ProfileActivity : ComponentActivity() {
                                 val loggedInUserId =
                                     backStackEntry.arguments?.getString("loggedInUserId")
                                         ?: return@composable
-                                ReadingListScreen(navController = navController, userId = loggedInUserId)
+                                ReadingListScreen(
+                                    navController = navController,
+                                    userId = loggedInUserId
+                                )
                             }
                             composable(
                                 "reading_list_story_detail/{storyId}/{userId}",
-                                arguments = listOf(navArgument("storyId") { type = NavType.StringType },
+                                arguments = listOf(navArgument("storyId") {
+                                    type = NavType.StringType
+                                },
                                     navArgument("userId") { type = NavType.StringType })
                             ) { backStackEntry ->
                                 val storyId = backStackEntry.arguments?.getString("storyId")
-                                val userId = backStackEntry.arguments?.getString("userId")
-                                ReadingListStoryDetailScreen(navController, storyId, userId ?: "")
+                                backStackEntry.arguments?.getString("userId")
+                                ReadingListStoryDetailScreen(navController, storyId)
                             }
                             composable(
                                 "published_stories/{userId}",
@@ -150,22 +185,33 @@ class ProfileActivity : ComponentActivity() {
                                 val userId =
                                     backStackEntry.arguments?.getString("userId")
                                         ?: return@composable
-                                PublishedStoriesScreen(navController = navController, userId = userId)
+                                PublishedStoriesScreen(
+                                    navController = navController,
+                                    userId = userId
+                                )
                             }
                             composable(
                                 "published_story_detail/{storyId}/{userId}",
-                                arguments = listOf(navArgument("storyId") { type = NavType.StringType },
+                                arguments = listOf(navArgument("storyId") {
+                                    type = NavType.StringType
+                                },
                                     navArgument("userId") { type = NavType.StringType })
                             ) { backStackEntry ->
                                 val storyId = backStackEntry.arguments?.getString("storyId")
                                 val userId = backStackEntry.arguments?.getString("userId")
-                                PublishedStoryDetailScreen(navController, storyId, userId ?: "")
+                                PublishedStoryDetailScreen(navController, storyId)
                             }
                             composable("story_parts/{storyId}") { backStackEntry ->
-                                StoryPartsScreen(navController, backStackEntry.arguments?.getString("storyId"))
+                                StoryPartsScreen(
+                                    navController,
+                                    backStackEntry.arguments?.getString("storyId")
+                                )
                             }
                             composable("read_story_part/{partId}") { backStackEntry ->
-                                ReadStoryPartScreen(navController, backStackEntry.arguments?.getString("partId"))
+                                ReadStoryPartScreen(
+                                    navController,
+                                    backStackEntry.arguments?.getString("partId")
+                                )
                             }
                         }
                     }
@@ -176,6 +222,7 @@ class ProfileActivity : ComponentActivity() {
         }
     }
 
+    @Deprecated("This method has been deprecated in favor of using the\n      {@link OnBackPressedDispatcher} via {@link #getOnBackPressedDispatcher()}.\n      The OnBackPressedDispatcher controls how back button events are dispatched\n      to one or more {@link OnBackPressedCallback} objects.")
     override fun onBackPressed() {
         if (::navController.isInitialized && navController.currentDestination?.route == "profile") {
             val intent = Intent(this, HomeActivity::class.java)
@@ -255,8 +302,8 @@ fun ProfileScreen(
     navController: NavHostController
 ) {
     // State variables for followers and following count
-    var currentFollowersCount by remember { mutableStateOf(followersCount) }
-    var currentFollowingCount by remember { mutableStateOf(followingCount) }
+    var currentFollowersCount by remember { mutableIntStateOf(followersCount) }
+    var currentFollowingCount by remember { mutableIntStateOf(followingCount) }
 
     // Context and Firestore instance
     val context = LocalContext.current
@@ -570,7 +617,7 @@ fun FollowersScreen(
                     ) {
                         followerProfilePictureUrl?.let { url ->
                             Image(
-                                painter = rememberImagePainter(url),
+                                painter = rememberAsyncImagePainter(url),
                                 contentDescription = "Profile Picture",
                                 modifier = Modifier
                                     .size(50.dp)
@@ -640,7 +687,7 @@ fun FollowingScreen(
                     ) {
                         followingProfilePictureUrl?.let { url ->
                             Image(
-                                painter = rememberImagePainter(url),
+                                painter = rememberAsyncImagePainter(url),
                                 contentDescription = "Profile Picture",
                                 modifier = Modifier
                                     .size(50.dp)
@@ -668,8 +715,8 @@ fun UserProfileScreen(navController: NavHostController, userId: String, loggedIn
     var userName by remember { mutableStateOf("Loading...") }
     var userEmail by remember { mutableStateOf("Loading...") }
     var profilePictureUrl by remember { mutableStateOf<String?>(null) }
-    var followersCount by remember { mutableStateOf(0) }
-    var followingCount by remember { mutableStateOf(0) }
+    var followersCount by remember { mutableIntStateOf(0) }
+    var followingCount by remember { mutableIntStateOf(0) }
     var isFollowing by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -687,7 +734,7 @@ fun UserProfileScreen(navController: NavHostController, userId: String, loggedIn
                     followingCount = (document.get("following") as? List<*>)?.size ?: 0
 
                     if (loggedInUserId.isNotEmpty()) {
-                        val followingList = document.get("followers") as? List<String>
+                        val followingList = document.get("followers") as? List<*>
                         isFollowing = followingList?.contains(loggedInUserId) ?: false
                     }
                 }
@@ -726,7 +773,7 @@ fun UserProfileScreen(navController: NavHostController, userId: String, loggedIn
         ) {
             profilePictureUrl?.let { url ->
                 Image(
-                    painter = rememberImagePainter(url),
+                    painter = rememberAsyncImagePainter(url),
                     contentDescription = "Profile Picture",
                     modifier = Modifier
                         .size(200.dp)
@@ -773,7 +820,7 @@ fun UserProfileScreen(navController: NavHostController, userId: String, loggedIn
                         .padding(horizontal = 50.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Column() {
+                    Column {
                         TextButton(
                             onClick = { },
                             modifier = Modifier
@@ -793,7 +840,7 @@ fun UserProfileScreen(navController: NavHostController, userId: String, loggedIn
                             )
                         }
                     }
-                    Column() {
+                    Column {
                         TextButton(
                             onClick = { },
                             modifier = Modifier
@@ -864,7 +911,8 @@ fun PublishedStoriesScreen(navController: NavHostController, userId: String) {
                             title = doc.getString("title") ?: "",
                             imageUrl = doc.getString("coverImageUrl") ?: "",
                             authorId = doc.getString("userId") ?: "",
-                            createdAt = doc.getTimestamp("createdAt") ?: com.google.firebase.Timestamp.now()
+                            createdAt = doc.getTimestamp("createdAt")
+                                ?: com.google.firebase.Timestamp.now()
                         )
                     } catch (e: Exception) {
                         Log.e("Firestore", "Error parsing story document", e)
@@ -916,7 +964,7 @@ fun PublishedStoriesScreen(navController: NavHostController, userId: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PublishedStoryDetailScreen(navController: NavHostController, storyId: String?, userId: String) {
+fun PublishedStoryDetailScreen(navController: NavHostController, storyId: String?) {
     val firestore = remember { FirebaseFirestore.getInstance() }
     var storyDetail by remember { mutableStateOf<StoryDetail?>(null) }
     var isLoading by remember { mutableStateOf(true) }
@@ -935,7 +983,8 @@ fun PublishedStoryDetailScreen(navController: NavHostController, storyId: String
                                     title = document.getString("title") ?: "",
                                     imageUrl = document.getString("coverImageUrl") ?: "",
                                     author = authorName,
-                                    createdAt = document.getTimestamp("createdAt") ?: com.google.firebase.Timestamp.now(),
+                                    createdAt = document.getTimestamp("createdAt")
+                                        ?: com.google.firebase.Timestamp.now(),
                                     category = document.getString("category") ?: "",
                                     description = document.getString("description") ?: ""
                                 )
@@ -1034,7 +1083,11 @@ fun PublishedStoryDetailScreen(navController: NavHostController, storyId: String
                             .height(50.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8BBF8C))
                     ) {
-                        Text(text = "See The Content", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "See The Content",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
@@ -1063,7 +1116,8 @@ fun ReadingListScreen(navController: NavHostController, userId: String) {
                                         title = doc.getString("title") ?: "",
                                         imageUrl = doc.getString("coverImageUrl") ?: "",
                                         authorId = doc.getString("userId") ?: "",
-                                        createdAt = doc.getTimestamp("createdAt") ?: com.google.firebase.Timestamp.now()
+                                        createdAt = doc.getTimestamp("createdAt")
+                                            ?: com.google.firebase.Timestamp.now()
                                     )
                                 } catch (e: Exception) {
                                     Log.e("Firestore", "Error parsing story document", e)
@@ -1106,7 +1160,11 @@ fun ReadingListScreen(navController: NavHostController, userId: String) {
             }
         } else if (readingList.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = "No stories in your reading list", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    text = "No stories in your reading list",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         } else {
             LazyColumn(contentPadding = paddingValues) {
@@ -1123,7 +1181,10 @@ fun ReadingListScreen(navController: NavHostController, userId: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReadingListStoryDetailScreen(navController: NavHostController, storyId: String?, userId: String) {
+fun ReadingListStoryDetailScreen(
+    navController: NavHostController,
+    storyId: String?
+) {
     val firestore = remember { FirebaseFirestore.getInstance() }
     var storyDetail by remember { mutableStateOf<StoryDetail?>(null) }
     var isLoading by remember { mutableStateOf(true) }
@@ -1142,7 +1203,8 @@ fun ReadingListStoryDetailScreen(navController: NavHostController, storyId: Stri
                                     title = document.getString("title") ?: "",
                                     imageUrl = document.getString("coverImageUrl") ?: "",
                                     author = authorName,
-                                    createdAt = document.getTimestamp("createdAt") ?: com.google.firebase.Timestamp.now(),
+                                    createdAt = document.getTimestamp("createdAt")
+                                        ?: com.google.firebase.Timestamp.now(),
                                     category = document.getString("category") ?: "",
                                     description = document.getString("description") ?: ""
                                 )
@@ -1241,7 +1303,11 @@ fun ReadingListStoryDetailScreen(navController: NavHostController, storyId: Stri
                             .height(50.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8BBF8C))
                     ) {
-                        Text(text = "Continue Reading", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "Continue Reading",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }

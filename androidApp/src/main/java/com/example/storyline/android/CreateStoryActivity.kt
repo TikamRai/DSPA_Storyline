@@ -31,8 +31,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.NavigationBar
@@ -65,7 +65,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import coil.compose.rememberImagePainter
+import coil.compose.rememberAsyncImagePainter
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
@@ -87,7 +87,7 @@ class CreateStoryActivity : ComponentActivity() {
             Theme {
                 NavHost(navController, startDestination = "create_screen") {
                     composable("create_screen") {
-                        CreateScreen(navController, auth, firestore, storage)
+                        CreateScreen(navController, auth, firestore)
                     }
                     composable("creation_screen") {
                         CreationScreen(navController, auth, firestore, storage)
@@ -106,7 +106,7 @@ class CreateStoryActivity : ComponentActivity() {
                         val storyId = backStackEntry.arguments?.getString("storyId")
                         val isDraft =
                             backStackEntry.arguments?.getString("isDraft")?.toBoolean() ?: false
-                        EditStoryScreen(navController, storyId, firestore, storage, isDraft, auth)
+                        EditStoryScreen(navController, storyId, firestore, isDraft, auth)
                     }
                     composable(
                         "story_part_editor_screen/{draftPartId}",
@@ -120,6 +120,7 @@ class CreateStoryActivity : ComponentActivity() {
         }
     }
 
+    @Deprecated("This method has been deprecated in favor of using the\n      {@link OnBackPressedDispatcher} via {@link #getOnBackPressedDispatcher()}.\n      The OnBackPressedDispatcher controls how back button events are dispatched\n      to one or more {@link OnBackPressedCallback} objects.")
     override fun onBackPressed() {
         if (::navController.isInitialized && navController.currentDestination?.route == "create_screen") {
             val intent = Intent(this, HomeActivity::class.java)
@@ -140,8 +141,7 @@ class CreateStoryActivity : ComponentActivity() {
 fun CreateScreen(
     navController: NavHostController,
     auth: FirebaseAuth,
-    firestore: FirebaseFirestore,
-    storage: FirebaseStorage
+    firestore: FirebaseFirestore
 ) {
     val currentUser = auth.currentUser?.uid
     val drafts = remember { mutableStateOf<List<Map<String, Any>>>(emptyList()) }
@@ -560,6 +560,10 @@ fun StoryEditorScreen(
 ) {
     var storyPartTitle by remember { mutableStateOf(TextFieldValue()) }
     var storyContent by remember { mutableStateOf(TextFieldValue()) }
+    val storyPartWordLimit = 5000
+
+    val wordCount = storyContent.text.split("\\s+".toRegex()).filter { it.isNotEmpty() }.size
+    val remainingWords = storyPartWordLimit - wordCount
 
     Scaffold(
         topBar = {
@@ -577,7 +581,8 @@ fun StoryEditorScreen(
                 modifier = Modifier
                     .padding(paddingValues)
                     .padding(16.dp)
-                    .fillMaxSize(),
+                    .fillMaxSize()
+                    .background(Color.White),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 TextField(
@@ -601,11 +606,28 @@ fun StoryEditorScreen(
                     )
                 )
 
-                Divider(thickness = 1.dp, color = Color.Gray)
+                HorizontalDivider(thickness = 1.dp, color = Color.Gray)
+
+                Text(
+                    text = "Word count: $wordCount/$storyPartWordLimit",
+                    modifier = Modifier.align(Alignment.End),
+                    color = if (remainingWords < 0) Color.Red else Color.Gray
+                )
+                Text(
+                    text = "Words remaining: $remainingWords",
+                    modifier = Modifier.align(Alignment.End),
+                    color = if (remainingWords < 0) Color.Red else Color.Gray
+                )
 
                 TextField(
                     value = storyContent,
-                    onValueChange = { storyContent = it },
+                    onValueChange = { it ->
+                        if (it.text.split("\\s+".toRegex())
+                                .filter { it.isNotEmpty() }.size <= storyPartWordLimit
+                        ) {
+                            storyContent = it
+                        }
+                    },
                     placeholder = {
                         Text(
                             text = "Tap here to start writing",
@@ -749,7 +771,6 @@ fun EditStoryScreen(
     navController: NavHostController,
     storyId: String?,
     firestore: FirebaseFirestore,
-    storage: FirebaseStorage,
     isDraft: Boolean,
     auth: FirebaseAuth
 ) {
@@ -830,7 +851,7 @@ fun EditStoryScreen(
                 ) {
                     storyCoverUri?.let {
                         Image(
-                            painter = rememberImagePainter(it),
+                            painter = rememberAsyncImagePainter(it),
                             contentDescription = null,
                             modifier = Modifier.fillMaxSize()
                         )
@@ -1089,6 +1110,10 @@ fun StoryPartEditorScreen(
         }
     }
 
+    val partWordLimit = 5000
+    val wordsCount = draftPartContent.text.split("\\s+".toRegex()).filter { it.isNotEmpty() }.size
+    val remainingWords = partWordLimit - wordsCount
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -1105,7 +1130,8 @@ fun StoryPartEditorScreen(
                 modifier = Modifier
                     .padding(paddingValues)
                     .padding(16.dp)
-                    .fillMaxSize(),
+                    .fillMaxSize()
+                    .background(Color.White),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 TextField(
@@ -1124,11 +1150,29 @@ fun StoryPartEditorScreen(
                     )
                 )
 
-                Divider(color = Color.Gray, thickness = 1.dp)
+                HorizontalDivider(thickness = 1.dp, color = Color.Gray)
+
+                Text(
+                    text = "Word count: $wordsCount/$partWordLimit",
+                    modifier = Modifier.align(Alignment.End),
+                    color = if (wordsCount > partWordLimit) Color.Red else Color.Gray
+                )
+
+                Text(
+                    text = "Remaining words: $remainingWords",
+                    modifier = Modifier.align(Alignment.End),
+                    color = if (remainingWords < 0) Color.Red else Color.Gray
+                )
 
                 TextField(
                     value = draftPartContent,
-                    onValueChange = { draftPartContent = it },
+                    onValueChange = {
+                        val newWordsCount =
+                            it.text.split("\\s+".toRegex()).filter { it.isNotEmpty() }.size
+                        if (newWordsCount <= partWordLimit) {
+                            draftPartContent = it
+                        }
+                    },
                     placeholder = { if (!isContentAvailable) Text("Tap here to start writing") },
                     modifier = Modifier
                         .fillMaxSize()
@@ -1319,7 +1363,7 @@ fun PublishedListScreen(
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Image(
-                                            painter = rememberImagePainter(story["coverImageUrl"] as String),
+                                            painter = rememberAsyncImagePainter(story["coverImageUrl"] as String),
                                             contentDescription = null,
                                             modifier = Modifier
                                                 .size(120.dp)
