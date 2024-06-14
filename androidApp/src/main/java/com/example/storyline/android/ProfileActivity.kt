@@ -1,6 +1,5 @@
 package com.example.storyline.android
 
-import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -24,13 +23,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonColors
-import androidx.compose.material3.ElevatedButton
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -60,22 +60,19 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import coil.compose.rememberAsyncImagePainter
+import coil.compose.rememberImagePainter
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.launch
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.ButtonDefaults
-import androidx.navigation.NavType
-import androidx.navigation.navArgument
-import coil.compose.rememberAsyncImagePainter
-import com.google.firebase.firestore.FieldValue
 
 
 class ProfileActivity : ComponentActivity() {
@@ -97,7 +94,11 @@ class ProfileActivity : ComponentActivity() {
 
         firestore.collection("users").document(user.uid).addSnapshotListener { snapshot, e ->
             if (e != null) {
-                Toast.makeText(this, "Failed to listen for user data changes: ${e.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    this,
+                    "Failed to listen for user data changes: ${e.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
                 return@addSnapshotListener
             }
 
@@ -133,10 +134,15 @@ class ProfileActivity : ComponentActivity() {
                             }
                             composable(
                                 "userProfile/{userId}/{loggedInUserId}",
-                                arguments = listOf(navArgument("userId") { type = NavType.StringType }, navArgument("loggedInUserId") { type = NavType.StringType })
+                                arguments = listOf(navArgument("userId") {
+                                    type = NavType.StringType
+                                }, navArgument("loggedInUserId") { type = NavType.StringType })
                             ) { backStackEntry ->
-                                val userId = backStackEntry.arguments?.getString("userId") ?: return@composable
-                                val loggedInUserId = backStackEntry.arguments?.getString("loggedInUserId") ?: return@composable
+                                val userId = backStackEntry.arguments?.getString("userId")
+                                    ?: return@composable
+                                val loggedInUserId =
+                                    backStackEntry.arguments?.getString("loggedInUserId")
+                                        ?: return@composable
                                 UserProfileScreen(navController, userId, loggedInUserId)
                             }
                         }
@@ -147,6 +153,7 @@ class ProfileActivity : ComponentActivity() {
             }
         }
     }
+
     override fun onBackPressed() {
         if (::navController.isInitialized && navController.currentDestination?.route == "profile") {
             val intent = Intent(this, HomeActivity::class.java)
@@ -238,7 +245,11 @@ fun ProfileScreen(
         firestore.collection("users").document(loggedInUserId)
             .addSnapshotListener { snapshot, e ->
                 if (e != null) {
-                    Toast.makeText(context, "Failed to listen for user data changes: ${e.message}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        context,
+                        "Failed to listen for user data changes: ${e.message}",
+                        Toast.LENGTH_SHORT
+                    ).show()
                     return@addSnapshotListener
                 }
 
@@ -491,7 +502,11 @@ fun BottomNavigationBar(currentRoute: String, navController: NavHostController, 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FollowersScreen(navController: NavHostController, followers: List<String>, loggedInUserId: String) {
+fun FollowersScreen(
+    navController: NavHostController,
+    followers: List<String>,
+    loggedInUserId: String
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -511,11 +526,13 @@ fun FollowersScreen(navController: NavHostController, followers: List<String>, l
                     var followerProfilePictureUrl by remember { mutableStateOf<String?>(null) }
 
                     LaunchedEffect(followerId) {
-                        FirebaseFirestore.getInstance().collection("users").document(followerId).get()
+                        FirebaseFirestore.getInstance().collection("users").document(followerId)
+                            .get()
                             .addOnSuccessListener { document ->
                                 if (document != null) {
                                     followerName = document.getString("name") ?: "No name"
-                                    followerProfilePictureUrl = document.getString("profilePictureUrl")
+                                    followerProfilePictureUrl =
+                                        document.getString("profilePictureUrl")
                                 }
                             }
                     }
@@ -531,13 +548,19 @@ fun FollowersScreen(navController: NavHostController, followers: List<String>, l
                     ) {
                         followerProfilePictureUrl?.let { url ->
                             Image(
-                                painter = rememberAsyncImagePainter(url),
+                                painter = rememberImagePainter(url),
                                 contentDescription = "Profile Picture",
                                 modifier = Modifier
                                     .size(50.dp)
                                     .clip(CircleShape)
                             )
-                        }
+                        } ?: Image(
+                            painter = painterResource(id = R.drawable.applogo),
+                            contentDescription = "Profile Picture",
+                            modifier = Modifier
+                                .size(50.dp)
+                                .clip(CircleShape)
+                        )
                         Spacer(modifier = Modifier.width(16.dp))
                         Text(text = followerName)
                     }
@@ -549,7 +572,11 @@ fun FollowersScreen(navController: NavHostController, followers: List<String>, l
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FollowingScreen(navController: NavHostController, following: List<String>, loggedInUserId: String) {
+fun FollowingScreen(
+    navController: NavHostController,
+    following: List<String>,
+    loggedInUserId: String
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -569,11 +596,13 @@ fun FollowingScreen(navController: NavHostController, following: List<String>, l
                     var followingProfilePictureUrl by remember { mutableStateOf<String?>(null) }
 
                     LaunchedEffect(followingId) {
-                        FirebaseFirestore.getInstance().collection("users").document(followingId).get()
+                        FirebaseFirestore.getInstance().collection("users").document(followingId)
+                            .get()
                             .addOnSuccessListener { document ->
                                 if (document != null) {
                                     followingName = document.getString("name") ?: "No name"
-                                    followingProfilePictureUrl = document.getString("profilePictureUrl")
+                                    followingProfilePictureUrl =
+                                        document.getString("profilePictureUrl")
                                 }
                             }
                     }
@@ -589,13 +618,19 @@ fun FollowingScreen(navController: NavHostController, following: List<String>, l
                     ) {
                         followingProfilePictureUrl?.let { url ->
                             Image(
-                                painter = rememberAsyncImagePainter(url),
+                                painter = rememberImagePainter(url),
                                 contentDescription = "Profile Picture",
                                 modifier = Modifier
                                     .size(50.dp)
                                     .clip(CircleShape)
                             )
-                        }
+                        } ?: Image(
+                            painter = painterResource(id = R.drawable.applogo),
+                            contentDescription = "Profile Picture",
+                            modifier = Modifier
+                                .size(50.dp)
+                                .clip(CircleShape)
+                        )
                         Spacer(modifier = Modifier.width(16.dp))
                         Text(text = followingName)
                     }
@@ -669,20 +704,26 @@ fun UserProfileScreen(navController: NavHostController, userId: String, loggedIn
         ) {
             profilePictureUrl?.let { url ->
                 Image(
-                    painter = rememberAsyncImagePainter(url),
+                    painter = rememberImagePainter(url),
                     contentDescription = "Profile Picture",
                     modifier = Modifier
                         .size(200.dp)
                         .clip(CircleShape)
                 )
-            }
+            } ?: Image(
+                painter = painterResource(id = R.drawable.applogo),
+                contentDescription = "Profile Picture",
+                modifier = Modifier
+                    .size(200.dp)
+                    .clip(CircleShape)
+            )
+
             Spacer(modifier = Modifier.height(16.dp))
             Text(text = userName, fontSize = 24.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
             Text(text = userEmail, fontSize = 16.sp, color = Color.Gray)
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Follow/Unfollow Button
             Button(
                 onClick = {
                     isFollowing = !isFollowing
@@ -756,7 +797,12 @@ fun UserProfileScreen(navController: NavHostController, userId: String, loggedIn
     }
 }
 
-private fun updateFollowStatus(userId: String, loggedInUserId: String, isFollowing: Boolean, onComplete: () -> Unit) {
+private fun updateFollowStatus(
+    userId: String,
+    loggedInUserId: String,
+    isFollowing: Boolean,
+    onComplete: () -> Unit
+) {
     val firestore = FirebaseFirestore.getInstance()
     val userRef = firestore.collection("users").document(userId)
     val loggedInUserRef = firestore.collection("users").document(loggedInUserId)

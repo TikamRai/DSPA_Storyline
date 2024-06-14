@@ -59,6 +59,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import coil.compose.rememberAsyncImagePainter
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
@@ -74,13 +75,22 @@ class HomeActivity : ComponentActivity() {
                 NavHost(navController, startDestination = "home") {
                     composable("home") { HomeScreen(navController) }
                     composable("story_detail/{storyId}") { backStackEntry ->
-                        StoryDetailScreen(navController, backStackEntry.arguments?.getString("storyId"))
+                        StoryDetailScreen(
+                            navController,
+                            backStackEntry.arguments?.getString("storyId")
+                        )
                     }
                     composable("story_parts/{storyId}") { backStackEntry ->
-                        StoryPartsScreen(navController, backStackEntry.arguments?.getString("storyId"))
+                        StoryPartsScreen(
+                            navController,
+                            backStackEntry.arguments?.getString("storyId")
+                        )
                     }
                     composable("read_story_part/{partId}") { backStackEntry ->
-                        ReadStoryPartScreen(navController, backStackEntry.arguments?.getString("partId"))
+                        ReadStoryPartScreen(
+                            navController,
+                            backStackEntry.arguments?.getString("partId")
+                        )
                     }
                 }
             }
@@ -111,10 +121,20 @@ fun HomeScreen(navController: NavHostController) {
     var lastVisibleStory by remember { mutableStateOf<DocumentSnapshot?>(null) }
     var isFetchingMore by remember { mutableStateOf(false) }
     val loadedStoryIds by remember { mutableStateOf<MutableSet<String>>(mutableSetOf()) }
+    var followedUserIds by remember { mutableStateOf<List<String>>(emptyList()) }
+
+    val context = LocalContext.current
+    val currentUser = FirebaseAuth.getInstance().currentUser
+    val userId = currentUser?.uid ?: ""
 
     fun fetchStories() {
+        if (followedUserIds.isEmpty()) {
+            return
+        }
+
         val query = firestore.collection("stories")
             .whereEqualTo("status", "published")
+            .whereIn("userId", followedUserIds)
             .orderBy("publishedAt", Query.Direction.DESCENDING)
             .limit(10)
 
@@ -141,7 +161,8 @@ fun HomeScreen(navController: NavHostController) {
                             title = document.getString("title") ?: "",
                             imageUrl = document.getString("coverImageUrl") ?: "",
                             authorId = userId,
-                            createdAt = document.getTimestamp("createdAt") ?: com.google.firebase.Timestamp.now()
+                            createdAt = document.getTimestamp("createdAt")
+                                ?: com.google.firebase.Timestamp.now()
                         )
                     } catch (e: Exception) {
                         Log.e("Firestore", "Error parsing story document", e)
@@ -160,8 +181,25 @@ fun HomeScreen(navController: NavHostController) {
             }
     }
 
+    fun fetchFollowedUserIds(userId: String) {
+        firestore.collection("users").document(userId).get()
+            .addOnSuccessListener { document ->
+                val following = document.get("following") as? List<String> ?: emptyList()
+                followedUserIds = following
+                if (following.isNotEmpty()) {
+                    fetchStories()
+                } else {
+                    isLoading = false
+                }
+            }
+            .addOnFailureListener { exception ->
+                Log.w("Firestore", "Error getting followed user IDs: ", exception)
+                isLoading = false
+            }
+    }
+
     LaunchedEffect(Unit) {
-        fetchStories()
+        fetchFollowedUserIds(userId)
     }
 
     Scaffold(
@@ -180,28 +218,53 @@ fun HomeScreen(navController: NavHostController) {
                 CircularProgressIndicator()
             }
         } else {
-            LazyColumn(
-                contentPadding = paddingValues,
-                modifier = Modifier.padding(16.dp),
-                state = rememberLazyListState().apply {
-                    this.onBottomReached {
-                        if (!isFetchingMore) {
-                            isFetchingMore = true
-                            fetchStories()
-                        }
+            if (followedUserIds.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "No stories to read.",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Follow someone to read their story.",
+                            fontSize = 20.sp,
+                            color = Color.Gray
+                        )
                     }
                 }
-            ) {
-                items(stories) { story ->
-                    StoryItem(story = story, onClick = {
-                        navController.navigate("story_detail/${story.id}")
-                    })
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-                if (isFetchingMore) {
-                    item {
-                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator()
+            } else {
+                LazyColumn(
+                    contentPadding = paddingValues,
+                    modifier = Modifier.padding(16.dp),
+                    state = rememberLazyListState().apply {
+                        this.onBottomReached {
+                            if (!isFetchingMore) {
+                                isFetchingMore = true
+                                fetchStories()
+                            }
+                        }
+                    }
+                ) {
+                    items(stories) { story ->
+                        StoryItem(story = story, onClick = {
+                            navController.navigate("story_detail/${story.id}")
+                        })
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+                    if (isFetchingMore) {
+                        item {
+                            Box(
+                                modifier = Modifier.fillMaxWidth(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator()
+                            }
                         }
                     }
                 }
@@ -298,7 +361,8 @@ fun StoryDetailScreen(navController: NavHostController, storyId: String?) {
                                     title = document.getString("title") ?: "",
                                     imageUrl = document.getString("coverImageUrl") ?: "",
                                     author = authorName,
-                                    createdAt = document.getTimestamp("createdAt") ?: com.google.firebase.Timestamp.now(),
+                                    createdAt = document.getTimestamp("createdAt")
+                                        ?: com.google.firebase.Timestamp.now(),
                                     category = document.getString("category") ?: "",
                                     description = document.getString("description") ?: ""
                                 )
@@ -362,7 +426,7 @@ fun StoryDetailScreen(navController: NavHostController, storyId: String?) {
                         modifier = Modifier.padding(start = 4.dp)
                     )
                     Text(
-                        text = "Category: ${story.category}",
+                        text = story.category,
                         fontSize = 16.sp,
                         color = Color.Gray,
                         modifier = Modifier.padding(start = 4.dp)
@@ -425,7 +489,8 @@ fun StoryPartsScreen(navController: NavHostController, storyId: String?) {
                                 id = document.id,
                                 title = document.getString("title") ?: "",
                                 content = document.getString("content") ?: "",
-                                writtenAt = document.getTimestamp("writtenAt") ?: com.google.firebase.Timestamp.now()
+                                writtenAt = document.getTimestamp("writtenAt")
+                                    ?: com.google.firebase.Timestamp.now()
                             )
                         } catch (e: Exception) {
                             Log.e("Firestore", "Error parsing story part document", e)
@@ -516,7 +581,8 @@ fun ReadStoryPartScreen(navController: NavHostController, partId: String?) {
                             id = document.id,
                             title = document.getString("title") ?: "",
                             content = document.getString("content") ?: "",
-                            writtenAt = document.getTimestamp("writtenAt") ?: com.google.firebase.Timestamp.now()
+                            writtenAt = document.getTimestamp("writtenAt")
+                                ?: com.google.firebase.Timestamp.now()
                         )
                         isLoading = false
                     } else {
@@ -547,7 +613,11 @@ fun ReadStoryPartScreen(navController: NavHostController, partId: String?) {
                 },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.Black)
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color.Black
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)

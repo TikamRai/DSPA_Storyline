@@ -10,13 +10,35 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -84,7 +106,8 @@ fun SearchUserApp(navController: NavHostController, firestore: FirebaseFirestore
     var query by remember { mutableStateOf(TextFieldValue()) }
     var searchResults by remember { mutableStateOf<List<User>>(emptyList()) }
     val context = LocalContext.current
-    val loggedInUserId = "your_logged_in_user_id_here" // Retrieve logged-in user ID from your authentication system
+    val loggedInUserId =
+        "your_logged_in_user_id_here" // Retrieve logged-in user ID from your authentication system
 
     Column(
         modifier = Modifier
@@ -137,7 +160,12 @@ fun SearchUserApp(navController: NavHostController, firestore: FirebaseFirestore
 }
 
 @Composable
-fun SearchResultItem(context: Context, user: User, loggedInUserId: String, onUserClicked: () -> Unit) {
+fun SearchResultItem(
+    context: Context,
+    user: User,
+    loggedInUserId: String,
+    onUserClicked: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -150,18 +178,30 @@ fun SearchResultItem(context: Context, user: User, loggedInUserId: String, onUse
                     context.startActivity(intent)
                 } catch (e: Exception) {
                     Log.e("SearchResultItem", "Error starting activity: ${e.message}")
-                    Toast.makeText(context, "Error opening user profile", Toast.LENGTH_SHORT).show()
+                    Toast
+                        .makeText(context, "Error opening user profile", Toast.LENGTH_SHORT)
+                        .show()
                 }
             },
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Image(
-            painter = rememberImagePainter(user.profilePictureUrl),
-            contentDescription = "Profile Picture",
-            modifier = Modifier
-                .size(50.dp)
-                .clip(CircleShape)
-        )
+        if (user.profilePictureUrl != null) {
+            Image(
+                painter = rememberImagePainter(user.profilePictureUrl),
+                contentDescription = "Profile Picture",
+                modifier = Modifier
+                    .size(50.dp)
+                    .clip(CircleShape)
+            )
+        } else {
+            Image(
+                painter = painterResource(id = R.drawable.applogo),
+                contentDescription = "Profile Picture",
+                modifier = Modifier
+                    .size(50.dp)
+                    .clip(CircleShape)
+            )
+        }
 
         Spacer(modifier = Modifier.width(16.dp))
 

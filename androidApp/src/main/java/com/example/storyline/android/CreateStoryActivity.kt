@@ -309,7 +309,7 @@ fun BottomNavigationBar(currentRoute: String, context: Context) {
                 )
             },
             selected = currentRoute == "create",
-            onClick = { } 
+            onClick = { }
         )
         NavigationBarItem(
             icon = {
