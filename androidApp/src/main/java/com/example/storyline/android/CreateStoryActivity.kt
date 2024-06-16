@@ -66,6 +66,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import coil.compose.rememberAsyncImagePainter
+import coil.compose.rememberImagePainter
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
@@ -371,23 +372,34 @@ fun CreationScreen(
                         .clickable { imagePickerLauncher.launch("image/*") },
                     contentAlignment = Alignment.Center
                 ) {
-                    Column {
-                        Box(
-                            modifier = Modifier.fillMaxWidth(1f),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "+",
-                                fontSize = 50.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Box(
-                            modifier = Modifier.fillMaxWidth(1f),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("Add Story Cover")
+                    storyCoverUri?.let { uri ->
+                        Image(
+                            painter = rememberImagePainter(uri),
+                            contentDescription = "Story Cover Image",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(8.dp),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                        )
+                    } ?: run {
+                        Column {
+                            Box(
+                                modifier = Modifier.fillMaxWidth(1f),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "+",
+                                    fontSize = 50.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Box(
+                                modifier = Modifier.fillMaxWidth(1f),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("Add Story Cover")
+                            }
                         }
                     }
                 }
@@ -491,6 +503,7 @@ fun CreationScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // Button to upload story and navigate to editor screen
                 OutlinedButton(
                     onClick = {
                         storyCoverUri?.let { uri ->
